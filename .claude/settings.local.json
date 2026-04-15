@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm create:*)",
+      "Bash(npx create-vite@latest . --template react --force)",
+      "Bash(npx create-vite@latest . --template react)",
+      "Bash(npm install:*)",
+      "Bash(npm run:*)",
+      "Bash(npx vite:*)",
+      "mcp__plugin_claude-mem_mcp-search__get_observations",
+      "Bash(npx supabase:*)",
+      "Bash(node build.js --dev)",
+      "mcp__plugin_claude-mem_mcp-search__smart_outline",
+      "Bash(node build.js)",
+      "Bash(find C:\\\\Users\\\\DELL\\\\Downloads\\\\linkedin pilot\\\\extension\\\\contents:*)",
+      "Bash(python -c \"import ast; ast.parse\\(open\\('C:/Users/DELL/Downloads/linkedin pilot/backend/main.py'\\).read\\(\\)\\); print\\('main.py syntax OK'\\)\")",
+      "Bash(grep -i \"workspace_settings\\\\|team_invitations\" \"/c/Users/DELL/Downloads/linkedin pilot/supabase/schema.sql\" \"/c/Users/DELL/Downloads/linkedin pilot/supabase/migrations/\"*.sql)",
+      "Bash(grep:*)",
+      "Bash(claude mcp:*)",
+      "WebSearch",
+      "Bash(python -c \"import graphify\")",
+      "Bash(pip install:*)",
+      "Bash(mkdir -p graphify-out)",
+      "Bash(python -c ':*)",
+      "Bash(python3 *)"
+    ]
+  }
+}

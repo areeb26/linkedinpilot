@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+playwright
+supabase
+cryptography
+google-generativeai
+yfinance
+duckduckgo-search
+python-dotenv
+psycopg2-binary
+requests

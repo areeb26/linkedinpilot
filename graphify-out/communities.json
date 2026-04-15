@@ -1,0 +1,380 @@
+[
+  {
+    "id": 0,
+    "size": 6,
+    "nodes": [
+      "eslint_config_js",
+      "globals",
+      "config",
+      "eslint_plugin_react",
+      "eslint_plugin_react_hooks",
+      "js"
+    ]
+  },
+  {
+    "id": 1,
+    "size": 1,
+    "nodes": [
+      "postcss_config_js"
+    ]
+  },
+  {
+    "id": 2,
+    "size": 1,
+    "nodes": [
+      "tailwind_config_js"
+    ]
+  },
+  {
+    "id": 3,
+    "size": 4,
+    "nodes": [
+      "path",
+      "vite_config_js",
+      "plugin_react",
+      "vite"
+    ]
+  },
+  {
+    "id": 4,
+    "size": 3,
+    "nodes": [
+      "extension_build_js",
+      "build_main",
+      "build_loadenv"
+    ]
+  },
+  {
+    "id": 5,
+    "size": 1,
+    "nodes": [
+      "extension_postcss_config_js"
+    ]
+  },
+  {
+    "id": 6,
+    "size": 1,
+    "nodes": [
+      "extension_tailwind_config_js"
+    ]
+  },
+  {
+    "id": 7,
+    "size": 57,
+    "nodes": [
+      "usecampaigns_usecampaigns",
+      "usecampaigns_usedeletecampaign",
+      "useteam_useremovemember",
+      "src_hooks_useactionqueue_js",
+      "react_query",
+      "usecampaigns_useduplicatecampaign",
+      "src_hooks_useautomations_js",
+      "react_hot_toast",
+      "usemessages_usesendmessage",
+      "useautomations_usedeleteautomation"
+    ]
+  },
+  {
+    "id": 8,
+    "size": 12,
+    "nodes": [
+      "usechartdata_buildemptybuckets",
+      "src_hooks_store_uistore",
+      "usechartdata_fetchchartdata",
+      "usechartdata_getstartdate",
+      "usedashboardstats_getstartdate",
+      "src_hooks_store_workspacestore",
+      "src_hooks_lib_supabase",
+      "usedashboardstats_usedashboardstats",
+      "usechartdata_usechartdata",
+      "src_hooks_usechartdata_js"
+    ]
+  },
+  {
+    "id": 9,
+    "size": 3,
+    "nodes": [
+      "extension_lib_supabase_ts",
+      "src_lib_supabase_js",
+      "supabase_js"
+    ]
+  },
+  {
+    "id": 10,
+    "size": 4,
+    "nodes": [
+      "tailwind_merge",
+      "utils_cn",
+      "clsx",
+      "src_lib_utils_js"
+    ]
+  },
+  {
+    "id": 11,
+    "size": 6,
+    "nodes": [
+      "pathlib",
+      "json",
+      "graphify_check_py",
+      "graphify_run_rationale_1",
+      "graphify_run_py",
+      "graphify"
+    ]
+  },
+  {
+    "id": 12,
+    "size": 13,
+    "nodes": [
+      "engine_linkedinscraper_scrape_profile",
+      "engine_linkedinscraper_init",
+      "engine_linkedinscraper_check_page_errors",
+      "engine_linkedinscraper_send_connection_request",
+      "engine_linkedinscraper_init_browser",
+      "engine_rationale_46",
+      "engine_rationale_340",
+      "engine_linkedinscraper_login_with_credentials",
+      "engine_linkedinscraper",
+      "engine_linkedinscraper_close"
+    ]
+  },
+  {
+    "id": 13,
+    "size": 43,
+    "nodes": [
+      "asyncio",
+      "main_rationale_209",
+      "base64",
+      "os",
+      "utils_exceptions",
+      "main_shutdown",
+      "backend_scraper_engine_py",
+      "main_rationale_59",
+      "main_rationale_176",
+      "main_startup"
+    ]
+  },
+  {
+    "id": 14,
+    "size": 7,
+    "nodes": [
+      "discovery_get_financial_info",
+      "duckduckgo_search",
+      "backend_utils_discovery_py",
+      "discovery_rationale_5",
+      "yfinance",
+      "discovery_rationale_22",
+      "discovery_find_procurement_portals"
+    ]
+  },
+  {
+    "id": 15,
+    "size": 14,
+    "nodes": [
+      "exceptions_actiontimeouterror",
+      "exceptions_linkedinerror",
+      "exceptions_rationale_2",
+      "exceptions_accountrestrictederror",
+      "exceptions_rationale_14",
+      "exceptions_rationale_6",
+      "backend_utils_exceptions_py",
+      "exceptions_sessionexpirederror",
+      "exception",
+      "exceptions_rationale_18"
+    ]
+  },
+  {
+    "id": 16,
+    "size": 26,
+    "nodes": [
+      "src_main_jsx",
+      "background_syncinboxacrossalltabs",
+      "src_app",
+      "background_resolveprofile",
+      "background_sendscrapemessage",
+      "background_subscribetoqueue",
+      "background_fetchprofiledata",
+      "background_updateactionstatus",
+      "popup_handlefixconnection",
+      "background_checkpendingactions"
+    ]
+  },
+  {
+    "id": 17,
+    "size": 2,
+    "nodes": [
+      "dashboard_syncworkspace",
+      "extension_contents_dashboard_ts"
+    ]
+  },
+  {
+    "id": 18,
+    "size": 2,
+    "nodes": [
+      "extension_contents_interceptor_ts",
+      "interceptor_initializeinterceptor"
+    ]
+  },
+  {
+    "id": 19,
+    "size": 38,
+    "nodes": [
+      "linkedin_scrapegroupmembers",
+      "linkedin_normalizecommenter",
+      "linkedin_fetchconversationsviaapi",
+      "linkedin_fetchprofileviaapi",
+      "linkedin_sendconnectionrequest",
+      "linkedin_scrapeleads",
+      "linkedin_handlegraphqldata",
+      "linkedin_normalizeprofile",
+      "linkedin_normalizesearchhit",
+      "linkedin_scrapecomments"
+    ]
+  },
+  {
+    "id": 20,
+    "size": 1,
+    "nodes": [
+      "extension_types_supabase_ts"
+    ]
+  },
+  {
+    "id": 21,
+    "size": 2,
+    "nodes": [
+      "cors_handlecors",
+      "supabase_functions_shared_cors_ts"
+    ]
+  },
+  {
+    "id": 22,
+    "size": 83,
+    "nodes": [
+      "campaigns_campaigns",
+      "uselinkedinaccounts",
+      "campaigncard_campaigncard",
+      "linkedinaccounts_globalstat",
+      "endnode",
+      "connectaccountmodal_connectaccountmodal",
+      "input",
+      "react_dropzone",
+      "automationconfigdrawer_automationconfigdrawer",
+      "triggernode"
+    ]
+  },
+  {
+    "id": 23,
+    "size": 31,
+    "nodes": [
+      "src_components_layout_appshell_jsx",
+      "header_useravatar",
+      "header_header",
+      "react_router_dom",
+      "leaddatabase",
+      "dashboard",
+      "appshell",
+      "src_app_jsx",
+      "queryclient",
+      "leadextractor"
+    ]
+  },
+  {
+    "id": 24,
+    "size": 2,
+    "nodes": [
+      "src_pages_contentassistant_jsx",
+      "contentassistant_contentassistant"
+    ]
+  },
+  {
+    "id": 25,
+    "size": 13,
+    "nodes": [
+      "settings_settings",
+      "settings_webhookaction",
+      "settings_workspacesection",
+      "useusagestats",
+      "useteam",
+      "settings_integrationssection",
+      "settings_teamsection",
+      "settings_settingstabtrigger",
+      "settings_integrationcard",
+      "settings_usagecard"
+    ]
+  },
+  {
+    "id": 26,
+    "size": 3,
+    "nodes": [
+      "gemini_invokeai",
+      "src_lib_supabase",
+      "src_lib_gemini_js"
+    ]
+  },
+  {
+    "id": 27,
+    "size": 5,
+    "nodes": [
+      "src_store_workspacestore_js",
+      "src_store_authstore_js",
+      "zustand",
+      "middleware",
+      "src_store_uistore_js"
+    ]
+  },
+  {
+    "id": 28,
+    "size": 4,
+    "nodes": [
+      "logging",
+      "backend_utils_logger_py",
+      "logger_setup_logger",
+      "sys"
+    ]
+  },
+  {
+    "id": 29,
+    "size": 8,
+    "nodes": [
+      "supabase_js_2",
+      "supabase_functions_queue_action_shared_cors_ts",
+      "supabase_functions_save_leads_shared_cors_ts",
+      "supabase_functions_connect_account_shared_cors_ts",
+      "supabase_functions_connect_account_index_ts",
+      "supabase_functions_save_leads_index_ts",
+      "supabase_functions_queue_action_index_ts",
+      "server_ts"
+    ]
+  },
+  {
+    "id": 30,
+    "size": 56,
+    "nodes": [
+      "src_components_ui_card_jsx",
+      "react_checkbox",
+      "src_components_extractor_sourcecard",
+      "src_components_ui_button_jsx",
+      "src_components_activitychart_jsx",
+      "utils",
+      "src_components_campaigns_nodes_actionnode_jsx",
+      "src_components_ui_select_jsx",
+      "activitychart_activitychart",
+      "react_slider"
+    ]
+  },
+  {
+    "id": 31,
+    "size": 12,
+    "nodes": [
+      "leadextractorwizard",
+      "importmodal",
+      "leadextractor_leadextractor",
+      "src_pages_leaddatabase_jsx",
+      "src_pages_leadextractor_jsx",
+      "bulkactionbar",
+      "leadtable",
+      "leaddatabase_leaddatabase",
+      "leadfilters",
+      "useleads"
+    ]
+  }
+]
