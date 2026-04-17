@@ -31,7 +31,7 @@ const ActivityChart = () => {
           {[
             { label: 'Connections', color: 'bg-primary' },
             { label: 'Accepted', color: 'bg-warning' },
-            { label: 'Messages', color: 'bg-orange-500' },
+            { label: 'Messages', color: 'bg-accent' },
           ].map((item) => (
             <div key={item.label} className="flex items-center gap-2">
               <div className={`w-2.5 h-2.5 rounded-full ${item.color}`} />
@@ -86,8 +86,8 @@ const ActivityChart = () => {
             <Area
               type="monotone"
               dataKey="messages"
-              stroke="#f97316"
-              fill="#f97316"
+              stroke="oklch(var(--accent))"
+              fill="oklch(var(--accent))"
               fillOpacity={0.15}
               strokeWidth={2}
               dot={false}
@@ -95,8 +95,8 @@ const ActivityChart = () => {
             <Area
               type="monotone"
               dataKey="replies"
-              stroke="#ec4899"
-              fill="#ec4899"
+              stroke="oklch(var(--primary) / 0.8)"
+              fill="oklch(var(--primary) / 0.8)"
               fillOpacity={0.15}
               strokeWidth={2}
               dot={false}

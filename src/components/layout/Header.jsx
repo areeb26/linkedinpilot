@@ -1,4 +1,5 @@
 import { Bell, ChevronDown, Check } from 'lucide-react'
+import { ThemeToggle } from '@/components/theme-toggle'
 import { useState, useRef, useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useWorkspaceStore } from '@/store/workspaceStore'
@@ -38,7 +39,7 @@ function WorkspaceDropdown({ workspaceName, workspaces, onSelect }) {
         onClick={() => setOpen((v) => !v)}
         className="flex items-center gap-2 rounded-xl px-3 py-1.5 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground transition-all duration-200"
       >
-        <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-accent text-[10px] font-bold text-primary-foreground shadow-sm">
+        <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-primary text-[10px] font-bold text-primary-foreground">
           {displayName.slice(0, 1).toUpperCase()}
         </div>
         <span className="max-w-[140px] truncate font-medium">{displayName}</span>
@@ -75,7 +76,7 @@ function UserAvatar({ user }) {
     .join('')
 
   return (
-    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-accent text-xs font-semibold text-primary-foreground cursor-pointer hover:shadow-lg hover:shadow-primary/25 transition-all duration-300 hover:scale-105 active:scale-95 ring-2 ring-transparent hover:ring-primary/20">
+    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-xs font-semibold text-primary-foreground cursor-pointer hover:bg-primary/90 transition-all duration-200">
       {initials}
     </div>
   )
@@ -116,6 +117,9 @@ export function Header() {
           <Bell size={17} />
           <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-primary animate-pulse-subtle ring-2 ring-background" />
         </button>
+
+        {/* Theme toggle */}
+        <ThemeToggle />
 
         {/* Workspace selector */}
         <WorkspaceDropdown

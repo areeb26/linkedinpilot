@@ -36,14 +36,14 @@ export default function LeadDatabase() {
     <div className="space-y-6 pb-20">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold text-white">Lead Database</h2>
-          <p className="text-[#94a3b8] text-sm mt-1">{count} total leads found</p>
+          <h1 className="font-display text-2xl font-bold text-foreground">Lead Database</h1>
+          <p className="text-muted-foreground text-sm mt-1">{count} total leads found</p>
         </div>
         <div className="flex gap-3">
-          <Button variant="outline" size="sm" className="border-white/10" onClick={() => setIsImportModalOpen(true)}>
+          <Button variant="outline" size="sm" className="border-border" onClick={() => setIsImportModalOpen(true)}>
             <Upload className="h-4 w-4 mr-2" /> Import
           </Button>
-          <Button variant="outline" size="sm" className="border-white/10">
+          <Button variant="outline" size="sm" className="border-border">
             <Download className="h-4 w-4 mr-2" /> Export
           </Button>
         </div>

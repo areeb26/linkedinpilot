@@ -371,8 +371,9 @@ async function handleAction(action: string, payload: any) {
         return await scrapeLeads(payload)
       case "viewProfile":
         return await viewProfile(payload.url)
+      case "connect":
       case "sendConnectionRequest":
-        return await sendConnectionRequest(payload.url, payload.note)
+        return await sendConnectionRequest(payload.profile_url || payload.url, payload.message || payload.note)
       case "sendMessage":
         return await sendMessageViaAPI(payload.threadId || payload.url, payload.message)
       case "FETCH_CONVERSATIONS":
@@ -734,76 +735,218 @@ async function scrapeSearchResults(payload?: any) {
   let leads = await pollBuffer('search', 5000)
 
   if (leads.length === 0) {
-    // 2025-2026 Stable Selectors fallback (using data-view-name)
-    // Updated selectors for current LinkedIn search results page
-    const resultContainers = document.querySelectorAll(
-      'li.reusable-search__result-container, ' +
-      'div[data-view-name="search-result-entity"], ' +
-      'div[data-view-name="search-entity-result-universal-template"], ' +
-      '.entity-result, ' +
-      '.search-result__wrapper, ' +
-      '.artdeco-entity-lockup'
-    );
+    // STRATEGY: Find all profile links on the page, group by container, and extract data
+    console.log('[Scraper] Using link-based container discovery');
     
-    console.log(`[Scraper] Found ${resultContainers.length} result containers`);
+    // Find all profile links on the page
+    const allProfileLinks = Array.from(document.querySelectorAll('a[href*="/in/"]')) as HTMLAnchorElement[];
+    console.log(`[Scraper] Found ${allProfileLinks.length} profile links total`);
     
-    resultContainers.forEach((container, index) => {
+    // Group links by their closest list item or container ancestor
+    const containerMap = new Map<Element, HTMLAnchorElement[]>();
+    
+    for (const link of allProfileLinks) {
+        // Skip links that are clearly not people (companies, jobs, etc)
+        const href = link.href || '';
+        if (href.includes('/company/') || href.includes('/jobs/') || href.includes('/school/')) {
+            continue;
+        }
+        
+        // Skip links inside "mutual connection" elements
+        let isMutualConnection = false;
+        let parent = link.parentElement;
+        for (let i = 0; i < 4 && parent; i++) {
+            const text = parent.textContent?.toLowerCase() || '';
+            if (text.includes('is a mutual connection') || 
+                text.includes('mutual connections') ||
+                parent.classList.contains('reusable-search-simple-insight__text') ||
+                parent.classList.contains('reusable-search-simple-insight')) {
+                isMutualConnection = true;
+                break;
+            }
+            parent = parent.parentElement;
+        }
+        if (isMutualConnection) {
+            console.log('[Scraper DEBUG] Skipping mutual connection link');
+            continue;
+        }
+        
+        // Find the closest container (li, or div with specific attributes)
+        let container: Element | null = link;
+        for (let i = 0; i < 6 && container; i++) {
+            // Check if this is a good container
+            if (container.tagName === 'LI' || 
+                container.getAttribute('data-view-name')?.includes('search-result') ||
+                container.classList.contains('entity-result') ||
+                container.classList.contains('reusable-search__result-container') ||
+                container.getAttribute('data-chameleon-result-urn')) {
+                break;
+            }
+            container = container.parentElement;
+        }
+        
+        if (container && container !== link) {
+            if (!containerMap.has(container)) {
+                containerMap.set(container, []);
+            }
+            containerMap.get(container)!.push(link);
+        }
+    }
+    
+    console.log(`[Scraper] Grouped into ${containerMap.size} unique containers`);
+    
+    let index = 0;
+    for (const [container, links] of containerMap) {
         try {
-            // Try multiple selector patterns for name/title
-            const titleLink = container.querySelector(
-              'a[data-view-name="search-result-lockup-title"], ' +
-              '.entity-result__title-text a, ' +
-              '.artdeco-entity-lockup__title a, ' +
-              'a[href*="/in/"], ' +
-              'span.entity-result__title-text a'
-            ) as HTMLAnchorElement;
+            // Use the first valid link
+            const titleLink = links[0];
+            if (!titleLink?.href) continue;
             
-            // Try multiple selector patterns for subtitle/headline
-            const subtitle = container.querySelector(
-              'div[data-view-name="search-result-subtitle"], ' +
-              '.entity-result__primary-subtitle, ' +
-              '.artdeco-entity-lockup__subtitle, ' +
-              '.entity-result__summary, ' +
-              '[data-view-name="search-result-entity-sublabel"], ' +
-              '.entity-result__secondary-subtitle, ' +
-              '.subline-level-1'
-            ) as HTMLElement;
+            // Skip company/job links
+            const href = titleLink.href;
+            if (href.includes('/company/') || href.includes('/jobs/')) {
+                console.log(`[Scraper DEBUG] Container ${index}: Skipping non-person link`);
+                continue;
+            }
             
-            // Try multiple selector patterns for avatar
-            const avatarImg = container.querySelector(
-              'img[data-view-name="search-result-image"], ' +
-              '.presence-entity__image, ' +
-              '.artdeco-entity-lockup__image img, ' +
-              '.entity-result__image img, ' +
-              'img[src*="licdn.com/dms/image"]'
-            ) as HTMLImageElement;
-
-            if (titleLink && titleLink.href && !titleLink.href.includes('/company/')) {
-                // LinkedIn injects visually-hidden status text ('Status is offline') inside name links.
-                // Prefer the aria-hidden span (visible label), else strip the status strings.
-                const ariaSpan = titleLink.querySelector('span[aria-hidden="true"]');
-                const nameText = ariaSpan?.textContent?.trim() ||
-                    titleLink.innerText
-                        ?.replace(/Status is (online|offline|away|recently active)/gi, '')
-                        ?.split('\n').map((s: string) => s.trim()).filter(Boolean)[0] ||
-                    titleLink.textContent?.trim() || "";
-                const profileUrl = titleLink.href.split('?')[0];
-
-                if (nameText && nameText !== "LinkedIn Member" && nameText !== "LinkedIn" && nameText.length > 0) {
-                    leads.push({
-                        full_name: nameText,
-                        profile_url: profileUrl,
-                        headline: subtitle?.innerText?.trim() || subtitle?.textContent?.trim() || "",
-                        avatar_url: avatarImg?.src || "",
-                        source: "lead-extractor"
-                    });
-                    console.log(`[Scraper] Extracted lead ${index}: ${nameText}`);
+            // Extract name from the link
+            let nameText = "";
+            
+            // Strategy 1: aria-hidden span (visible name)
+            const ariaSpan = titleLink.querySelector('span[aria-hidden="true"]');
+            if (ariaSpan?.textContent) {
+                const txt = ariaSpan.textContent.trim();
+                if (txt && !txt.match(/Status is/i) && !txt.match(/Provides services/i)) {
+                    nameText = txt;
                 }
             }
+            
+            // Strategy 2: Walk text nodes
+            if (!nameText) {
+                const walker = document.createTreeWalker(titleLink, NodeFilter.SHOW_TEXT, null);
+                let node;
+                while (node = walker.nextNode()) {
+                    const txt = node.textContent?.trim();
+                    if (txt && !txt.match(/Status is/i) && !txt.match(/Provides services/i) && 
+                        !txt.match(/^View/i) && !txt.match(/^[•·]/) && txt.length > 1) {
+                        nameText = txt;
+                        break;
+                    }
+                }
+            }
+            
+            // Strategy 3: innerText cleanup
+            if (!nameText && titleLink.innerText) {
+                nameText = titleLink.innerText
+                    .replace(/Status is.*$/gmi, '')
+                    .replace(/Provides services.*$/gmi, '')
+                    .replace(/View.*profile/gi, '')
+                    .replace(/[•·]\s*\d+/g, '')
+                    .replace(/[\n\s]+/g, ' ')
+                    .trim()
+                    .split(' ')
+                    .slice(0, 3)
+                    .join(' ');
+            }
+            
+            if (!nameText || nameText === "LinkedIn Member") {
+                console.log(`[Scraper DEBUG] Container ${index}: No valid name, skipping`);
+                index++;
+                continue;
+            }
+            
+            // Extract profile URL
+            const profileUrl = href.split('?')[0];
+            
+            // Find headline - look in container for subtitle-like elements
+            let headlineText = "";
+            const subtitleEl = container.querySelector(
+                'div[data-view-name="search-result-subtitle"], ' +
+                '[data-view-name="search-result-entity-sublabel"], ' +
+                '.entity-result__primary-subtitle, ' +
+                'div.t-14.t-black'  // Common LinkedIn headline style
+            );
+            if (subtitleEl) {
+                headlineText = subtitleEl.textContent?.trim() || "";
+            }
+            
+            // Find location - typically in t-14.t-normal divs after headline
+            let locationText = "";
+            const locationEl = container.querySelector(
+                'div.t-14.t-normal:not(.t-black)'  // Location is t-normal without t-black
+            );
+            if (locationEl) {
+                const text = locationEl.textContent?.trim() || "";
+                // Filter out non-location text (like connection counts)
+                if (text && !text.includes('mutual') && !text.includes('connection')) {
+                    locationText = text;
+                }
+            }
+            
+            // Find services/about - from "Provides services" elements
+            let servicesText = "";
+            const servicesStrong = container.querySelector('strong');
+            if (servicesStrong?.textContent?.includes('Provides services')) {
+                servicesText = servicesStrong.textContent.trim();
+            }
+            // Also check for services in other elements
+            if (!servicesText) {
+                const allElements = container.querySelectorAll('*');
+                for (const el of Array.from(allElements)) {
+                    const text = el.textContent?.trim() || '';
+                    if (text.startsWith('Provides services')) {
+                        servicesText = text;
+                        break;
+                    }
+                }
+            }
+            
+            // Find avatar - look for profile images
+            let avatarUrl = "";
+            const allImages = Array.from(container.querySelectorAll('img'));
+            for (const img of allImages) {
+                const src = img.src || '';
+                if (src.includes('licdn.com') && (
+                    src.includes('profile-displayphoto') || 
+                    src.includes('/dms/image')
+                )) {
+                    avatarUrl = src;
+                    break;
+                }
+            }
+            
+            // If no avatar in container, check siblings
+            if (!avatarUrl) {
+                const parent = container.parentElement;
+                if (parent) {
+                    const siblingImgs = Array.from(parent.querySelectorAll('img'));
+                    for (const img of siblingImgs) {
+                        const src = img.src || '';
+                        if (src.includes('profile-displayphoto') || src.includes('/dms/image')) {
+                            avatarUrl = src;
+                            break;
+                        }
+                    }
+                }
+            }
+            
+            leads.push({
+                full_name: nameText,
+                profile_url: profileUrl,
+                headline: headlineText,
+                location: locationText,
+                services: servicesText,
+                avatar_url: avatarUrl,
+                source: "lead-extractor"
+            });
+            console.log(`[Scraper] Extracted lead ${index}: ${nameText}`);
+            index++;
+            
         } catch (err) {
-            console.warn("[Scraper] Failed to parse DOM result:", err);
+            console.warn(`[Scraper] Failed to parse container ${index}:`, err);
+            index++;
         }
-    });
+    }
   } else {
     console.log(`[Search] Success! Using ${leads.length} leads from API buffer`)
   }

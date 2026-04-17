@@ -86,11 +86,11 @@ export function Sidebar({ collapsed, onToggle }) {
       {/* Logo */}
       <div className="flex h-14 items-center border-b border-border px-4">
         <div className="flex items-center gap-2.5 overflow-hidden">
-          <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-accent shadow-lg shadow-primary/20">
+          <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl bg-primary">
             <span className="text-xs font-bold text-primary-foreground">LP</span>
           </div>
           {!collapsed && (
-            <span className="text-[15px] font-bold tracking-tight text-foreground">
+            <span className="font-display text-[15px] font-bold tracking-tight text-foreground">
               linkedpilot
             </span>
           )}
@@ -102,7 +102,7 @@ export function Sidebar({ collapsed, onToggle }) {
         {collapsed ? (
           <button
             onClick={() => navigate('/campaigns')}
-            className="flex h-9 w-full items-center justify-center rounded-lg bg-gradient-to-r from-primary to-accent text-primary-foreground hover:shadow-lg hover:shadow-primary/25 transition-all duration-300 hover:scale-105 hover:-translate-y-0.5"
+            className="flex h-9 w-full items-center justify-center rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-all duration-200"
             aria-label="Create campaign"
           >
             <Plus size={16} />
@@ -110,7 +110,7 @@ export function Sidebar({ collapsed, onToggle }) {
         ) : (
           <button
             onClick={() => navigate('/campaigns')}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary to-accent px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:shadow-lg hover:shadow-primary/25 transition-all duration-300 hover:scale-[1.02] hover:-translate-y-0.5"
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-all duration-200"
           >
             <Plus size={16} />
             Create campaign
@@ -167,13 +167,13 @@ export function Sidebar({ collapsed, onToggle }) {
       <div className="border-t border-border/60 p-3">
         {collapsed ? (
           <div className="flex justify-center">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-accent text-xs font-semibold text-primary-foreground flex-shrink-0 shadow-lg shadow-primary/20">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-xs font-semibold text-primary-foreground flex-shrink-0">
               {initials}
             </div>
           </div>
         ) : (
           <div className="flex items-center gap-3 rounded-xl px-3 py-2.5 hover:bg-secondary/80 transition-all duration-200 cursor-pointer group">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-accent text-xs font-semibold text-primary-foreground flex-shrink-0 shadow-md shadow-primary/20 group-hover:shadow-lg group-hover:shadow-primary/30 group-hover:scale-105 transition-all duration-300">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-xs font-semibold text-primary-foreground flex-shrink-0 group-hover:bg-primary/90 transition-all duration-200">
               {initials}
             </div>
             <div className="flex-1 overflow-hidden">

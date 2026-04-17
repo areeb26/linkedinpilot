@@ -44,28 +44,28 @@ export default function InboundAutomations() {
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div className="space-y-1">
           <div className="flex items-center gap-2 mb-2">
-            <div className="p-1.5 rounded-lg bg-blue-500/10 border border-blue-500/20">
-              <Zap className="w-4 h-4 text-blue-400" />
+            <div className="p-1.5 rounded-lg bg-info/10 border border-info/20">
+              <Zap className="w-4 h-4 text-info" />
             </div>
-            <span className="text-[10px] font-bold text-blue-400 uppercase tracking-[0.2em]">Live Orchestration</span>
+            <span className="text-[10px] font-bold text-info uppercase tracking-[0.2em]">Live Orchestration</span>
           </div>
-          <h1 className="text-4xl font-bold text-white tracking-tight">Inbound Automations</h1>
-          <p className="text-[#94a3b8] text-sm">Convert passive engagement into active leads using trigger-based workflows.</p>
+          <h1 className="font-display text-4xl font-bold text-foreground tracking-tight">Inbound Automations</h1>
+          <p className="text-muted-foreground text-sm">Convert passive engagement into active leads using trigger-based workflows.</p>
         </div>
 
         <div className="flex items-center gap-4">
           <div className="relative group min-w-[300px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#444] group-focus-within:text-blue-500 transition-colors" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-info transition-colors" />
             <Input 
               placeholder="Search active workflows..." 
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-10 bg-white/5 border-white/5 focus:border-blue-500/50 h-12 text-sm"
+              className="pl-10 bg-muted border-border focus:border-primary/50 h-12 text-sm"
             />
           </div>
           <Button 
             onClick={() => handleNew()}
-            className="bg-blue-600 hover:bg-blue-500 text-white font-bold h-12 px-6 uppercase tracking-widest text-xs"
+            className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold h-12 px-6 uppercase tracking-widest text-xs"
           >
             <Plus className="w-4 h-4 mr-2" />
             Create New
@@ -77,8 +77,8 @@ export default function InboundAutomations() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <QuickStat label="Active Workflows" value={automations.filter(a => a.status === 'active').length} />
         <QuickStat label="Total Run Count" value={automations.reduce((acc, a) => acc + (a.run_count || 0), 0)} />
-        <QuickStat label="Leads Generated" value="1,284" color="text-green-400" />
-        <QuickStat label="Response Rate" value="42.5%" color="text-purple-400" />
+        <QuickStat label="Leads Generated" value="1,284" color="text-success" />
+        <QuickStat label="Response Rate" value="42.5%" color="text-primary" />
       </div>
 
       {/* Main Grid */}
@@ -87,8 +87,8 @@ export default function InboundAutomations() {
         {automations.length > 0 && (
           <div className="space-y-6">
             <div className="flex items-center gap-4">
-              <h2 className="text-[10px] font-bold text-[#444] uppercase tracking-[0.3em] whitespace-nowrap">Active Workflows</h2>
-              <div className="h-px w-full bg-white/5" />
+              <h2 className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.3em] whitespace-nowrap">Active Workflows</h2>
+              <div className="h-px w-full bg-border" />
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {filtered.map(automation => (

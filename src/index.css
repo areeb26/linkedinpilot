@@ -4,51 +4,50 @@
 
 @layer base {
   :root {
-    /* Semantic Color System using OKLCH - Warm tinted neutrals */
-    --background: 0.08 0.01 280;
-    --foreground: 0.95 0.01 280;
-    --card: 0.12 0.015 280;
-    --card-foreground: 0.95 0.01 280;
-    --popover: 0.1 0.01 280;
-    --popover-foreground: 0.95 0.01 280;
+    /* Light mode — Parchment & Brass */
+    --background: 0.97 0.01 95;
+    --foreground: 0.2 0.02 55;
+    --card: 1 0 0;
+    --card-foreground: 0.2 0.02 55;
+    --popover: 1 0 0;
+    --popover-foreground: 0.2 0.02 55;
 
-    /* Primary: Refined Teal - professional, trustworthy */
-    --primary: 0.55 0.14 195;
-    --primary-foreground: 0.98 0.005 280;
+    /* Primary: Warm amber/brass */
+    --primary: 0.6 0.18 55;
+    --primary-foreground: 0.98 0.005 95;
 
-    /* Secondary: Muted warm slate */
-    --secondary: 0.18 0.02 280;
-    --secondary-foreground: 0.95 0.01 280;
+    /* Secondary: Warm light gray */
+    --secondary: 0.95 0.01 90;
+    --secondary-foreground: 0.25 0.02 55;
 
-    /* Muted: Soft warm gray */
-    --muted: 0.2 0.015 280;
-    --muted-foreground: 0.6 0.02 280;
+    /* Muted: Warm gray */
+    --muted: 0.92 0.01 90;
+    --muted-foreground: 0.5 0.02 60;
 
-    /* Accent: Vibrant Cyan for contrast */
-    --accent: 0.65 0.18 220;
-    --accent-foreground: 0.1 0.01 220;
+    /* Accent: Warm gold */
+    --accent: 0.75 0.15 80;
+    --accent-foreground: 0.15 0.02 55;
 
-    /* Semantic colors - refined for better contrast */
-    --success: 0.6 0.16 150;
-    --success-foreground: 0.1 0.01 150;
-    --warning: 0.7 0.15 80;
-    --warning-foreground: 0.15 0.02 80;
-    --info: 0.6 0.14 250;
-    --info-foreground: 0.98 0.005 250;
+    /* Semantic colors */
+    --success: 0.55 0.15 150;
+    --success-foreground: 0.98 0.005 150;
+    --warning: 0.7 0.14 75;
+    --warning-foreground: 0.2 0.02 75;
+    --info: 0.55 0.12 240;
+    --info-foreground: 0.98 0.005 240;
 
-    --destructive: 0.55 0.18 25;
+    --destructive: 0.55 0.2 25;
     --destructive-foreground: 0.98 0.005 25;
 
-    --border: 0.2 0.015 280;
-    --input: 0.18 0.02 280;
-    --ring: 0.55 0.14 195;
-    --radius: 0.75rem;
+    --border: 0.85 0.01 90;
+    --input: 0.9 0.01 90;
+    --ring: 0.6 0.18 55;
+    --radius: 0.625rem;
 
-    /* Easing curves - refined motion */
+    /* Easing curves — expo only, no bounce */
     --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
     --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
     --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
-    --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 
     /* Spacing scale */
     --space-1: 0.25rem;
@@ -60,6 +59,47 @@
     --space-8: 2rem;
     --space-10: 2.5rem;
     --space-12: 3rem;
+  }
+
+  .dark {
+    /* Dark mode — Notion Black & Wild */
+    --background: 0.12 0 0;
+    --foreground: 0.95 0 0;
+    --card: 0.16 0 0;
+    --card-foreground: 0.95 0 0;
+    --popover: 0.14 0 0;
+    --popover-foreground: 0.95 0 0;
+
+    /* Primary: Pure white — stark, aggressive */
+    --primary: 0.95 0 0;
+    --primary-foreground: 0.12 0 0;
+
+    /* Secondary: Dark gray */
+    --secondary: 0.2 0 0;
+    --secondary-foreground: 0.95 0 0;
+
+    /* Muted: Gray */
+    --muted: 0.22 0 0;
+    --muted-foreground: 0.55 0 0;
+
+    /* Accent: White glow */
+    --accent: 0.85 0 0;
+    --accent-foreground: 0.12 0 0;
+
+    /* Semantic colors — desaturated for black theme */
+    --success: 0.6 0.1 150;
+    --success-foreground: 0.98 0 0;
+    --warning: 0.7 0.12 75;
+    --warning-foreground: 0.15 0 0;
+    --info: 0.6 0.08 250;
+    --info-foreground: 0.98 0 0;
+
+    --destructive: 0.55 0.18 25;
+    --destructive-foreground: 0.98 0 0;
+
+    --border: 0.22 0 0;
+    --input: 0.18 0 0;
+    --ring: 0.95 0 0;
   }
 }
 
@@ -81,8 +121,9 @@
     text-rendering: optimizeLegibility;
   }
 
-  /* Refined heading styles */
+  /* Refined heading styles — Fraunces carries hierarchy */
   h1, h2, h3, h4, h5, h6 {
+    font-family: 'Fraunces', Georgia, serif;
     @apply font-bold tracking-tight;
     text-wrap: balance;
   }
@@ -143,18 +184,18 @@
     border: 1px solid oklch(var(--foreground) / 0.08);
   }
 
-  /* Gradient borders */
-  .gradient-border {
+  /* Accent border — flat, no gradient */
+  .accent-border {
     position: relative;
   }
 
-  .gradient-border::before {
+  .accent-border::before {
     content: '';
     position: absolute;
     inset: 0;
     padding: 1px;
     border-radius: inherit;
-    background: linear-gradient(135deg, oklch(var(--primary) / 0.5), oklch(var(--accent) / 0.3));
+    background: oklch(var(--primary) / 0.4);
     -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
     mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
     -webkit-mask-composite: xor;
@@ -162,17 +203,14 @@
     pointer-events: none;
   }
 
-  /* Text gradient */
+  /* Text accent — flat color, no gradient */
   .text-gradient {
-    background: linear-gradient(135deg, oklch(var(--primary)), oklch(var(--accent)));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    color: oklch(var(--primary));
   }
 
-  /* Glow effect */
+  /* Glow effect — white glow on black */
   .glow-primary {
-    box-shadow: 0 0 40px -10px oklch(var(--primary) / 0.4);
+    box-shadow: 0 0 40px -10px oklch(var(--primary) / 0.25);
   }
 
   /* Focus ring */
@@ -206,12 +244,9 @@
     text-wrap: pretty;
   }
 
-  /* Gradient text with better fallback */
+  /* Primary text — flat white, no gradient */
   .text-gradient-primary {
-    background: linear-gradient(135deg, oklch(var(--primary)), oklch(var(--accent)));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    color: oklch(var(--primary));
   }
 
   /* Smooth scrollbar */

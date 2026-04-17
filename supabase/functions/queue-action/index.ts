@@ -24,7 +24,8 @@ serve(async (req) => {
     }
 
     const body = await req.json()
-    const { workspace_id, action, worker_url } = body
+    const { workspace_id, action } = body
+    const worker_url = Deno.env.get('LOGIN_WORKER_URL') || null
 
     // Verify user is member of workspace
     const { data: teamMember } = await supabase

@@ -22,7 +22,19 @@
       "Bash(pip install:*)",
       "Bash(mkdir -p graphify-out)",
       "Bash(python -c ':*)",
-      "Bash(python3 *)"
+      "Bash(python3 *)",
+      "Bash(npx eslint *)",
+      "Bash(python *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5173/)",
+      "mcp__chrome-devtools__list_pages",
+      "mcp__chrome-devtools__navigate_page",
+      "mcp__chrome-devtools__take_screenshot",
+      "Bash(curl -s http://localhost:5173)",
+      "mcp__chrome-devtools__new_page",
+      "Bash(cat src/lib/supabase.js)",
+      "Bash(cat src/lib/supabase.ts)",
+      "Bash(node -e \"const l = require\\('./node_modules/lucide-react'\\); const keys = Object.keys\\(l\\).filter\\(k => k.toLowerCase\\(\\).includes\\('linked'\\)\\); console.log\\(keys\\)\")",
+      "Bash(node -e \"const l = require\\('./node_modules/lucide-react'\\); const keys = Object.keys\\(l\\).filter\\(k => k.toLowerCase\\(\\).includes\\('link'\\) || k.toLowerCase\\(\\).includes\\('share'\\) || k.toLowerCase\\(\\).includes\\('network'\\)\\); console.log\\(keys.slice\\(0,20\\)\\)\")"
     ]
   }
 }

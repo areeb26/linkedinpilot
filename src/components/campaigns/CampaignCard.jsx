@@ -26,7 +26,7 @@ export default function CampaignCard({ campaign }) {
   const style = statusStyles[campaign.status] || statusStyles.draft
 
   return (
-    <Card className="bg-card border-border hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5 transition-all duration-300 group overflow-hidden hover:-translate-y-1">
+    <Card className="bg-card border-border hover:border-primary/30 transition-all duration-200 group overflow-hidden">
       <div className="p-5">
         <div className="flex items-start justify-between mb-4">
           <div className="space-y-1">
@@ -55,6 +55,11 @@ export default function CampaignCard({ campaign }) {
             <DropdownMenuContent align="end" className="w-48 bg-card border-border text-foreground animate-scale-in">
               <DropdownMenuItem asChild>
                 <Link to={`/campaigns/${campaign.id}`} className="flex items-center gap-2 cursor-pointer hover:text-foreground">
+                  <Edit2 className="w-4 h-4" /> View Campaign
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link to={`/campaigns/${campaign.id}/edit`} className="flex items-center gap-2 cursor-pointer hover:text-foreground">
                   <Edit2 className="w-4 h-4" /> Edit Campaign
                 </Link>
               </DropdownMenuItem>
@@ -104,7 +109,7 @@ export default function CampaignCard({ campaign }) {
             ) : (
               <Button
                 size="sm"
-                className="h-8 bg-primary hover:opacity-90 text-primary-foreground border-none px-4 transition-all duration-200 hover:scale-105"
+                className="h-8 bg-primary hover:bg-primary/90 text-primary-foreground border-none px-4"
                 onClick={() => launchMutation.mutate(campaign.id)}
                 disabled={campaign.status === 'completed'}
               >

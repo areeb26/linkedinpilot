@@ -24,11 +24,11 @@ export default function Campaigns() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 animate-fade-in">
         <div className="space-y-1">
-          <h1 className="text-2xl font-bold text-foreground tracking-tight">Campaigns</h1>
+          <h1 className="font-display text-2xl font-bold text-foreground tracking-tight">Campaigns</h1>
           <p className="text-muted-foreground text-sm">Manage and monitor your LinkedIn outreach sequences.</p>
         </div>
         <div className="flex items-center gap-3">
-          <Button asChild className="bg-primary hover:opacity-90 text-primary-foreground shadow-lg shadow-primary/20 px-6 transition-all duration-200 hover:scale-[1.02] hover-lift">
+          <Button asChild className="bg-primary hover:bg-primary/90 text-primary-foreground px-6">
             <Link to="/campaigns/new">
               <Plus className="w-4 h-4 mr-2" /> Create Campaign
             </Link>

@@ -10,6 +10,7 @@ import { supabase } from '@/lib/supabase'
 import Dashboard from '@/pages/Dashboard'
 import Campaigns from '@/pages/Campaigns'
 import CampaignBuilder from '@/pages/CampaignBuilder'
+import CampaignDetail from '@/pages/CampaignDetail'
 import LeadExtractor from '@/pages/LeadExtractor'
 import LeadDatabase from '@/pages/LeadDatabase'
 import Inbox from '@/pages/Inbox'
@@ -91,9 +92,9 @@ export default function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <div className="min-h-screen bg-background">
-          <Routes>
+        <BrowserRouter>
+          <div className="min-h-screen bg-background">
+            <Routes>
             <Route path="/auth" element={<Auth />} />
             <Route 
               path="/" 
@@ -109,7 +110,8 @@ export default function App() {
               <Route path="linkedin-accounts" element={<LinkedInAccounts />} />
               <Route path="campaigns" element={<Campaigns />} />
               <Route path="campaigns/new" element={<CampaignBuilder />} />
-              <Route path="campaigns/:id" element={<CampaignBuilder />} />
+              <Route path="campaigns/:id" element={<CampaignDetail />} />
+              <Route path="campaigns/:id/edit" element={<CampaignBuilder />} />
               <Route path="lead-extractor" element={<LeadExtractor />} />
               <Route path="leads" element={<LeadDatabase />} />
               <Route path="content" element={<ContentAssistant />} />

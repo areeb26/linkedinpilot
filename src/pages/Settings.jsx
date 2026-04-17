@@ -20,8 +20,8 @@ export default function Settings() {
   return (
     <div className="space-y-8 pb-20">
       <div className="flex flex-col gap-1">
-        <h1 className="text-3xl font-black text-white tracking-tighter uppercase">Protocol Settings</h1>
-        <p className="text-sm text-[#444] font-bold uppercase tracking-widest">Workspace Governance & Integration Hub</p>
+        <h1 className="font-display text-3xl font-black text-foreground tracking-tighter uppercase">Protocol Settings</h1>
+        <p className="text-sm text-muted-foreground font-bold uppercase tracking-widest">Workspace Governance & Integration Hub</p>
       </div>
 
       <Tabs defaultValue="workspace" orientation="vertical" className="flex flex-row gap-12 mt-8">
@@ -55,9 +55,9 @@ function SettingsTabTrigger({ value, icon: Icon, label }) {
   return (
     <TabsTrigger 
       value={value} 
-      className="flex items-center justify-start gap-4 px-4 py-3 border-none bg-transparent rounded-xl text-[#444] font-bold uppercase tracking-widest text-[10px] transition-all data-[state=active]:bg-white/5 data-[state=active]:text-white data-[state=active]:shadow-xl group"
+      className="flex items-center justify-start gap-4 px-4 py-3 border-none bg-transparent rounded-xl text-muted-foreground font-bold uppercase tracking-widest text-[10px] transition-all data-[state=active]:bg-muted data-[state=active]:text-foreground data-[state=active]:shadow-xl group"
     >
-      <Icon className="w-4 h-4 group-data-[state=active]:text-blue-400" />
+      <Icon className="w-4 h-4 group-data-[state=active]:text-info" />
       {label}
     </TabsTrigger>
   )

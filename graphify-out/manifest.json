@@ -1,406 +1,111 @@
 {
-  "processed": {
-    "eslint.config.js": {
-      "nodes": 1,
-      "edges": 5
-    },
-    "postcss.config.js": {
-      "nodes": 2,
-      "edges": 5
-    },
-    "tailwind.config.js": {
-      "nodes": 3,
-      "edges": 5
-    },
-    "vite.config.js": {
-      "nodes": 4,
-      "edges": 8
-    },
-    "extension\\build.js": {
-      "nodes": 7,
-      "edges": 10
-    },
-    "extension\\postcss.config.js": {
-      "nodes": 8,
-      "edges": 10
-    },
-    "extension\\tailwind.config.js": {
-      "nodes": 9,
-      "edges": 10
-    },
-    "src\\hooks\\useActionQueue.js": {
-      "nodes": 11,
-      "edges": 15
-    },
-    "src\\hooks\\useAi.js": {
-      "nodes": 13,
-      "edges": 18
-    },
-    "src\\hooks\\useAutomations.js": {
-      "nodes": 19,
-      "edges": 27
-    },
-    "src\\hooks\\useCampaigns.js": {
-      "nodes": 28,
-      "edges": 39
-    },
-    "src\\hooks\\useChartData.js": {
-      "nodes": 33,
-      "edges": 49
-    },
-    "src\\hooks\\useDashboardStats.js": {
-      "nodes": 37,
-      "edges": 57
-    },
-    "src\\hooks\\useLeads.js": {
-      "nodes": 45,
-      "edges": 69
-    },
-    "src\\hooks\\useLinkedInAccounts.js": {
-      "nodes": 51,
-      "edges": 79
-    },
-    "src\\hooks\\useMessages.js": {
-      "nodes": 58,
-      "edges": 90
-    },
-    "src\\hooks\\useTeam.js": {
-      "nodes": 63,
-      "edges": 97
-    },
-    "src\\hooks\\useUsageStats.js": {
-      "nodes": 65,
-      "edges": 102
-    },
-    "src\\hooks\\useWorkspace.js": {
-      "nodes": 69,
-      "edges": 108
-    },
-    "src\\lib\\gemini.js": {
-      "nodes": 71,
-      "edges": 110
-    },
-    "src\\lib\\queryClient.js": {
-      "nodes": 72,
-      "edges": 111
-    },
-    "src\\lib\\supabase.js": {
-      "nodes": 73,
-      "edges": 112
-    },
-    "src\\lib\\utils.js": {
-      "nodes": 75,
-      "edges": 115
-    },
-    "src\\store\\authStore.js": {
-      "nodes": 76,
-      "edges": 117
-    },
-    "src\\store\\uiStore.js": {
-      "nodes": 77,
-      "edges": 118
-    },
-    "src\\store\\workspaceStore.js": {
-      "nodes": 78,
-      "edges": 120
-    },
-    "_graphify_check.py": {
-      "nodes": 1,
-      "edges": 2
-    },
-    "_graphify_run.py": {
-      "nodes": 3,
-      "edges": 6
-    },
-    "backend\\main.py": {
-      "nodes": 18,
-      "edges": 36
-    },
-    "backend\\scraper\\engine.py": {
-      "nodes": 32,
-      "edges": 64
-    },
-    "backend\\utils\\ai_parser.py": {
-      "nodes": 35,
-      "edges": 69
-    },
-    "backend\\utils\\crypto.py": {
-      "nodes": 40,
-      "edges": 76
-    },
-    "backend\\utils\\db.py": {
-      "nodes": 42,
-      "edges": 80
-    },
-    "backend\\utils\\discovery.py": {
-      "nodes": 47,
-      "edges": 86
-    },
-    "backend\\utils\\exceptions.py": {
-      "nodes": 61,
-      "edges": 104
-    },
-    "backend\\utils\\logger.py": {
-      "nodes": 63,
-      "edges": 107
-    },
-    "extension\\background.ts": {
-      "nodes": 15,
-      "edges": 19
-    },
-    "extension\\contents\\dashboard.ts": {
-      "nodes": 17,
-      "edges": 20
-    },
-    "extension\\contents\\interceptor.ts": {
-      "nodes": 19,
-      "edges": 21
-    },
-    "extension\\contents\\linkedin.ts": {
-      "nodes": 57,
-      "edges": 101
-    },
-    "extension\\lib\\supabase.ts": {
-      "nodes": 58,
-      "edges": 102
-    },
-    "extension\\types\\supabase.ts": {
-      "nodes": 59,
-      "edges": 102
-    },
-    "supabase\\functions\\connect-account\\index.ts": {
-      "nodes": 60,
-      "edges": 105
-    },
-    "supabase\\functions\\queue-action\\index.ts": {
-      "nodes": 61,
-      "edges": 108
-    },
-    "supabase\\functions\\save-leads\\index.ts": {
-      "nodes": 62,
-      "edges": 111
-    },
-    "supabase\\functions\\_shared\\cors.ts": {
-      "nodes": 64,
-      "edges": 112
-    },
-    "extension\\popup.tsx": {
-      "nodes": 4,
-      "edges": 7
-    },
-    "src\\App.jsx": {
-      "nodes": 3,
-      "edges": 20
-    },
-    "src\\main.jsx": {
-      "nodes": 4,
-      "edges": 24
-    },
-    "src\\components\\ActivityChart.jsx": {
-      "nodes": 6,
-      "edges": 27
-    },
-    "src\\components\\ImportModal.jsx": {
-      "nodes": 8,
-      "edges": 39
-    },
-    "src\\components\\StatCard.jsx": {
-      "nodes": 10,
-      "edges": 43
-    },
-    "src\\components\\accounts\\AccountCard.jsx": {
-      "nodes": 12,
-      "edges": 53
-    },
-    "src\\components\\accounts\\ConnectAccountModal.jsx": {
-      "nodes": 14,
-      "edges": 66
-    },
-    "src\\components\\automations\\AutomationCard.jsx": {
-      "nodes": 16,
-      "edges": 75
-    },
-    "src\\components\\automations\\AutomationConfigDrawer.jsx": {
-      "nodes": 18,
-      "edges": 90
-    },
-    "src\\components\\campaigns\\CampaignCard.jsx": {
-      "nodes": 21,
-      "edges": 101
-    },
-    "src\\components\\campaigns\\nodes\\ActionNode.jsx": {
-      "nodes": 22,
-      "edges": 104
-    },
-    "src\\components\\campaigns\\nodes\\ConditionNode.jsx": {
-      "nodes": 23,
-      "edges": 107
-    },
-    "src\\components\\campaigns\\nodes\\EndNode.jsx": {
-      "nodes": 24,
-      "edges": 110
-    },
-    "src\\components\\campaigns\\nodes\\TriggerNode.jsx": {
-      "nodes": 25,
-      "edges": 113
-    },
-    "src\\components\\extractor\\LeadExtractorWizard.jsx": {
-      "nodes": 27,
-      "edges": 127
-    },
-    "src\\components\\extractor\\SourceCard.jsx": {
-      "nodes": 29,
-      "edges": 131
-    },
-    "src\\components\\extractor\\StepIndicator.jsx": {
-      "nodes": 31,
-      "edges": 135
-    },
-    "src\\components\\layout\\AppShell.jsx": {
-      "nodes": 33,
-      "edges": 140
-    },
-    "src\\components\\layout\\Header.jsx": {
-      "nodes": 37,
-      "edges": 149
-    },
-    "src\\components\\layout\\Sidebar.jsx": {
-      "nodes": 40,
-      "edges": 156
-    },
-    "src\\components\\leads\\BulkActionBar.jsx": {
-      "nodes": 42,
-      "edges": 160
-    },
-    "src\\components\\leads\\IcpConfigModal.jsx": {
-      "nodes": 44,
-      "edges": 167
-    },
-    "src\\components\\leads\\LeadFilters.jsx": {
-      "nodes": 46,
-      "edges": 173
-    },
-    "src\\components\\leads\\LeadTable.jsx": {
-      "nodes": 48,
-      "edges": 182
-    },
-    "src\\components\\ui\\avatar.jsx": {
-      "nodes": 49,
-      "edges": 185
-    },
-    "src\\components\\ui\\badge.jsx": {
-      "nodes": 51,
-      "edges": 189
-    },
-    "src\\components\\ui\\button.jsx": {
-      "nodes": 52,
-      "edges": 193
-    },
-    "src\\components\\ui\\card.jsx": {
-      "nodes": 53,
-      "edges": 195
-    },
-    "src\\components\\ui\\checkbox.jsx": {
-      "nodes": 54,
-      "edges": 199
-    },
-    "src\\components\\ui\\dialog.jsx": {
-      "nodes": 57,
-      "edges": 205
-    },
-    "src\\components\\ui\\dropdown-menu.jsx": {
-      "nodes": 59,
-      "edges": 210
-    },
-    "src\\components\\ui\\input.jsx": {
-      "nodes": 60,
-      "edges": 212
-    },
-    "src\\components\\ui\\label.jsx": {
-      "nodes": 61,
-      "edges": 216
-    },
-    "src\\components\\ui\\progress.jsx": {
-      "nodes": 62,
-      "edges": 219
-    },
-    "src\\components\\ui\\select.jsx": {
-      "nodes": 63,
-      "edges": 223
-    },
-    "src\\components\\ui\\separator.jsx": {
-      "nodes": 64,
-      "edges": 226
-    },
-    "src\\components\\ui\\sheet.jsx": {
-      "nodes": 67,
-      "edges": 233
-    },
-    "src\\components\\ui\\slider.jsx": {
-      "nodes": 68,
-      "edges": 236
-    },
-    "src\\components\\ui\\switch.jsx": {
-      "nodes": 69,
-      "edges": 239
-    },
-    "src\\components\\ui\\table.jsx": {
-      "nodes": 70,
-      "edges": 241
-    },
-    "src\\components\\ui\\tabs.jsx": {
-      "nodes": 71,
-      "edges": 244
-    },
-    "src\\components\\ui\\textarea.jsx": {
-      "nodes": 72,
-      "edges": 246
-    },
-    "src\\pages\\Auth.jsx": {
-      "nodes": 74,
-      "edges": 253
-    },
-    "src\\pages\\CampaignBuilder.jsx": {
-      "nodes": 78,
-      "edges": 274
-    },
-    "src\\pages\\Campaigns.jsx": {
-      "nodes": 80,
-      "edges": 283
-    },
-    "src\\pages\\ContentAssistant.jsx": {
-      "nodes": 82,
-      "edges": 284
-    },
-    "src\\pages\\Dashboard.jsx": {
-      "nodes": 84,
-      "edges": 289
-    },
-    "src\\pages\\InboundAutomations.jsx": {
-      "nodes": 87,
-      "edges": 300
-    },
-    "src\\pages\\Inbox.jsx": {
-      "nodes": 92,
-      "edges": 318
-    },
-    "src\\pages\\LeadDatabase.jsx": {
-      "nodes": 94,
-      "edges": 327
-    },
-    "src\\pages\\LeadExtractor.jsx": {
-      "nodes": 96,
-      "edges": 343
-    },
-    "src\\pages\\LinkedInAccounts.jsx": {
-      "nodes": 101,
-      "edges": 355
-    },
-    "src\\pages\\Settings.jsx": {
-      "nodes": 111,
-      "edges": 375
-    }
-  },
-  "total_nodes": 320,
-  "total_edges": 721
+  "eslint.config.js": 1776271951.707077,
+  "postcss.config.js": 1776271952.5266483,
+  "tailwind.config.js": 1776271952.7806137,
+  "vite.config.js": 1776271952.7851658,
+  "backend\\main.py": 1776334231.6239018,
+  "backend\\scraper\\engine.py": 1776271951.6879733,
+  "backend\\utils\\ai_parser.py": 1776271951.696743,
+  "backend\\utils\\crypto.py": 1776271951.698293,
+  "backend\\utils\\db.py": 1776271951.6993167,
+  "backend\\utils\\discovery.py": 1776271951.7013514,
+  "backend\\utils\\exceptions.py": 1776271951.703893,
+  "backend\\utils\\logger.py": 1776271951.704952,
+  "extension\\background.ts": 1776271951.7194228,
+  "extension\\build.js": 1776271951.7219734,
+  "extension\\popup.tsx": 1776271951.7911396,
+  "extension\\postcss.config.js": 1776271951.793297,
+  "extension\\tailwind.config.js": 1776271951.7984622,
+  "extension\\contents\\dashboard.ts": 1776271951.7711947,
+  "extension\\contents\\interceptor.ts": 1776271951.7728446,
+  "extension\\contents\\linkedin.ts": 1776335778.6935916,
+  "extension\\lib\\supabase.ts": 1776271951.777917,
+  "extension\\types\\supabase.ts": 1776271951.8029757,
+  "src\\App.jsx": 1776284131.2073622,
+  "src\\main.jsx": 1776271952.6605847,
+  "src\\components\\ActivityChart.jsx": 1776271952.532472,
+  "src\\components\\ImportModal.jsx": 1776271952.534818,
+  "src\\components\\StatCard.jsx": 1776271952.5358517,
+  "src\\components\\accounts\\AccountCard.jsx": 1776271952.5400634,
+  "src\\components\\accounts\\ConnectAccountModal.jsx": 1776271952.541078,
+  "src\\components\\automations\\AutomationCard.jsx": 1776271952.5436933,
+  "src\\components\\automations\\AutomationConfigDrawer.jsx": 1776271952.5458672,
+  "src\\components\\campaigns\\CampaignCard.jsx": 1776284152.5283947,
+  "src\\components\\campaigns\\nodes\\ActionNode.jsx": 1776271952.551119,
+  "src\\components\\campaigns\\nodes\\ConditionNode.jsx": 1776271952.5536418,
+  "src\\components\\campaigns\\nodes\\EndNode.jsx": 1776271952.555789,
+  "src\\components\\campaigns\\nodes\\TriggerNode.jsx": 1776271952.5568006,
+  "src\\components\\extractor\\LeadExtractorWizard.jsx": 1776271952.5618346,
+  "src\\components\\extractor\\SourceCard.jsx": 1776271952.5648856,
+  "src\\components\\extractor\\StepIndicator.jsx": 1776271952.5669718,
+  "src\\components\\layout\\AppShell.jsx": 1776271952.5714986,
+  "src\\components\\layout\\Header.jsx": 1776271952.574057,
+  "src\\components\\layout\\Sidebar.jsx": 1776271952.5760565,
+  "src\\components\\leads\\BulkActionBar.jsx": 1776271952.5795705,
+  "src\\components\\leads\\IcpConfigModal.jsx": 1776271952.5810764,
+  "src\\components\\leads\\LeadFilters.jsx": 1776271952.5826025,
+  "src\\components\\leads\\LeadTable.jsx": 1776271952.5841134,
+  "src\\components\\ui\\avatar.jsx": 1776271952.586838,
+  "src\\components\\ui\\badge.jsx": 1776271952.5888884,
+  "src\\components\\ui\\button.jsx": 1776271952.5908508,
+  "src\\components\\ui\\card.jsx": 1776271952.5928037,
+  "src\\components\\ui\\checkbox.jsx": 1776271952.5948136,
+  "src\\components\\ui\\dialog.jsx": 1776271952.5958285,
+  "src\\components\\ui\\dropdown-menu.jsx": 1776271952.59787,
+  "src\\components\\ui\\input.jsx": 1776271952.6003945,
+  "src\\components\\ui\\label.jsx": 1776271952.6017594,
+  "src\\components\\ui\\progress.jsx": 1776271952.6032698,
+  "src\\components\\ui\\select.jsx": 1776271952.6043017,
+  "src\\components\\ui\\separator.jsx": 1776271952.6077964,
+  "src\\components\\ui\\sheet.jsx": 1776271952.6098633,
+  "src\\components\\ui\\slider.jsx": 1776271952.610978,
+  "src\\components\\ui\\switch.jsx": 1776271952.612489,
+  "src\\components\\ui\\table.jsx": 1776271952.6153655,
+  "src\\components\\ui\\tabs.jsx": 1776271952.6178994,
+  "src\\components\\ui\\textarea.jsx": 1776271952.6199236,
+  "src\\hooks\\useActionQueue.js": 1776271952.6239579,
+  "src\\hooks\\useAi.js": 1776271952.625674,
+  "src\\hooks\\useAutomations.js": 1776271952.6271844,
+  "src\\hooks\\useCampaigns.js": 1776336030.2390926,
+  "src\\hooks\\useChartData.js": 1776271952.6307044,
+  "src\\hooks\\useDashboardStats.js": 1776271952.6326838,
+  "src\\hooks\\useExtractions.js": 1776271952.6348372,
+  "src\\hooks\\useLeads.js": 1776271952.636369,
+  "src\\hooks\\useLinkedInAccounts.js": 1776271952.6390274,
+  "src\\hooks\\useMessages.js": 1776271952.6409488,
+  "src\\hooks\\useTeam.js": 1776271952.642733,
+  "src\\hooks\\useUsageStats.js": 1776271952.6439927,
+  "src\\hooks\\useWorkspace.js": 1776271952.6467917,
+  "src\\lib\\gemini.js": 1776271952.6498446,
+  "src\\lib\\queryClient.js": 1776271952.6543643,
+  "src\\lib\\supabase.js": 1776271952.6570902,
+  "src\\lib\\utils.js": 1776271952.6581986,
+  "src\\pages\\Auth.jsx": 1776271952.6621065,
+  "src\\pages\\CampaignBuilder.jsx": 1776271952.6642363,
+  "src\\pages\\CampaignDetail.jsx": 1776335833.6191218,
+  "src\\pages\\Campaigns.jsx": 1776271952.6674223,
+  "src\\pages\\ContentAssistant.jsx": 1776271952.6723025,
+  "src\\pages\\Dashboard.jsx": 1776271952.6761613,
+  "src\\pages\\InboundAutomations.jsx": 1776271952.6772583,
+  "src\\pages\\Inbox.jsx": 1776271952.680649,
+  "src\\pages\\LeadDatabase.jsx": 1776271952.6820483,
+  "src\\pages\\LeadExtractor.jsx": 1776271952.6842606,
+  "src\\pages\\LinkedInAccounts.jsx": 1776271952.6883488,
+  "src\\pages\\Settings.jsx": 1776271952.689412,
+  "src\\store\\authStore.js": 1776271952.6924329,
+  "src\\store\\uiStore.js": 1776271952.6934457,
+  "src\\store\\workspaceStore.js": 1776271952.6958437,
+  "supabase\\functions\\connect-account\\index.ts": 1776271952.7477603,
+  "supabase\\functions\\queue-action\\index.ts": 1776336040.841151,
+  "supabase\\functions\\save-leads\\index.ts": 1776271952.753294,
+  "supabase\\functions\\_shared\\cors.ts": 1776271952.745251,
+  "agent.md": 1776272537.0736437,
+  "CLAUDE.md": 1776271951.675702,
+  "backend\\requirements.txt": 1776271951.6837194,
+  "extension\\build_log.txt": 1776271951.7696853,
+  "extension\\assets\\icon.png": 1776271951.7095976,
+  "extension\\assets\\icon128.png": 1776271951.7114174,
+  "extension\\assets\\icon16.png": 1776271951.7130392,
+  "extension\\assets\\icon32.png": 1776271951.714349,
+  "extension\\assets\\icon48.png": 1776271951.717389
 }

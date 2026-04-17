@@ -104,6 +104,13 @@ async def run_action(action_id: str):
                     await asyncio.sleep(5 * retries)
 
                 account = action["linkedin_accounts"]
+
+                # Reset daily counters if new UTC day
+                account = _check_and_reset_daily_counters(supabase, account)
+
+                # Enforce daily limits before executing
+                _check_limit(account, action["action_type"])
+
                 await _setup_session(account)
 
                 result = await _execute_action(action)
@@ -115,6 +122,9 @@ async def run_action(action_id: str):
                     "result": result,
                     "error_message": None
                 }).eq("id", action_id).execute()
+
+                # Increment daily counter after confirmed success
+                _increment_counter(supabase, account["id"], action["action_type"])
 
                 supabase.table("actions_log").insert({
                     "workspace_id": action["workspace_id"],
@@ -170,6 +180,60 @@ async def _setup_session(account: dict):
 
     else:
         raise ValueError(f"Unknown login_method: {login_method}")
+
+
+def _is_new_day(reset_at_str: str) -> bool:
+    """Return True if reset_at_str is from a previous UTC calendar day."""
+    if not reset_at_str:
+        return True
+    try:
+        reset_at = datetime.fromisoformat(reset_at_str.replace("Z", "+00:00"))
+        return reset_at.date() < datetime.now(timezone.utc).date()
+    except Exception:
+        return True
+
+
+def _check_and_reset_daily_counters(supabase, account: dict) -> dict:
+    """
+    If connections_reset_at is from a previous day, zero out today_connections
+    and today_messages. Returns the (possibly updated) account dict.
+    """
+    if _is_new_day(account.get("connections_reset_at")):
+        now_iso = datetime.now(timezone.utc).isoformat()
+        supabase.table("linkedin_accounts").update({
+            "today_connections": 0,
+            "today_messages": 0,
+            "connections_reset_at": now_iso,
+        }).eq("id", account["id"]).execute()
+        account = {**account, "today_connections": 0, "today_messages": 0}
+        logger.info(f"Daily counters reset for account {account['id']}")
+    return account
+
+
+def _check_limit(account: dict, action_type: str):
+    """Raise AccountRestrictedError (terminal — no retry) if daily limit reached."""
+    if action_type == "connect":
+        used = account.get("today_connections", 0)
+        limit = account.get("daily_connection_limit", 20)
+        if used >= limit:
+            raise AccountRestrictedError(
+                f"Daily connection limit reached ({used}/{limit}) for account {account['id']}"
+            )
+    elif action_type == "message":
+        used = account.get("today_messages", 0)
+        limit = account.get("daily_message_limit", 50)
+        if used >= limit:
+            raise AccountRestrictedError(
+                f"Daily message limit reached ({used}/{limit}) for account {account['id']}"
+            )
+
+
+def _increment_counter(supabase, account_id: str, action_type: str):
+    """Increment today_connections or today_messages after a successful action."""
+    if action_type == "connect":
+        supabase.rpc("increment_today_connections", {"account_id": account_id}).execute()
+    elif action_type == "message":
+        supabase.rpc("increment_today_messages", {"account_id": account_id}).execute()
 
 
 async def _execute_action(action: dict) -> dict:

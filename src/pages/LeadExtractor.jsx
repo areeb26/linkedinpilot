@@ -24,7 +24,8 @@ import {
   Award,
   FileSignature,
   Users,
-  Globe
+  Globe,
+  LinkedIn
 } from 'lucide-react'
 import {
   DropdownMenu,

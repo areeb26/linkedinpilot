@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "LinkedIn Pilot Extension",
-  "version": "1.0.0",
+  "version": "1.1.1",
   "description": "LinkedIn automation extension",
   "author": "Antigravity",
   "icons": {
@@ -36,9 +36,10 @@
       "run_at": "document_start"
     },
     {
-      "matches": ["*://*.linkedin.com/*"],
+      "matches": ["https://www.linkedin.com/*"],
       "js": ["contents/linkedin.js"],
-      "all_frames": true,
+      "world": "ISOLATED",
+      "all_frames": false,
       "run_at": "document_idle"
     },
     {

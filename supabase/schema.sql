@@ -54,6 +54,9 @@ create table if not exists linkedin_accounts (
   status              text not null default 'pending', -- pending | active | warming | paused | disconnected | error
   daily_connection_limit  int not null default 20,
   daily_message_limit     int not null default 50,
+  today_connections       int not null default 0,
+  today_messages          int not null default 0,
+  connections_reset_at    timestamptz not null default now(),
   warmup_enabled      boolean not null default false,
   proxy_id            uuid,
   login_method        text not null default 'extension', -- extension | cookies | credentials

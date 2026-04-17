@@ -81,7 +81,7 @@ export default function Auth() {
           <div className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-card border border-border shadow-2xl mb-6 glow-primary">
             <Shield className="h-8 w-8 text-primary" />
           </div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+          <h1 className="font-display text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
             {isLogin ? 'Welcome Back' : 'Join LinkedPilot'}
           </h1>
           <p className="mt-2 text-muted-foreground">
