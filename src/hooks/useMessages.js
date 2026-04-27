@@ -157,7 +157,7 @@ export function useSendMessage() {
   const { workspaceId } = useWorkspaceStore()
 
   return useMutation({
-    mutationFn: async ({ thread_id, body, lead_id, linkedin_account_id, campaign_id }) => {
+    mutationFn: async ({ thread_id, body, lead_id, linkedin_account_id, campaign_id, profile_url }) => {
       const { data, error } = await supabase
         .from('messages')
         .insert([{
@@ -171,8 +171,35 @@ export function useSendMessage() {
           sent_at: new Date().toISOString()
         }])
         .select()
-      
+
       if (error) throw error
+
+      // Queue the actual LinkedIn delivery via worker/extension
+      if (profile_url && linkedin_account_id) {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session) {
+          fetch(
+            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/queue-action`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${session.access_token}`,
+              },
+              body: JSON.stringify({
+                workspace_id: workspaceId,
+                action: {
+                  action_type: 'message',
+                  linkedin_account_id,
+                  lead_id,
+                  payload: { profile_url, message: body, threadId: thread_id },
+                },
+              }),
+            }
+          ).catch((err) => console.error('Failed to queue message action:', err))
+        }
+      }
+
       return data[0]
     },
     onSuccess: (data) => {
@@ -231,7 +258,7 @@ export function useRealtime() {
             queryClient.invalidateQueries({ queryKey: ['thread', payload.new.thread_id] })
             
             if (payload.eventType === 'INSERT' && payload.new.direction === 'inbound') {
-              toast('New message from ' + (payload.new.lead?.full_name || 'Prospect'), {
+              toast('New message received', {
                 icon: '📩',
               })
             }

@@ -1,5 +1,17 @@
 {
   "mcpServers": {
+    "firecrawl": {
+      "command": "firecrawl-mcp",
+      "env": {
+        "FIRECRAWL_API_KEY": "fc-4ec79ca611b34834aba51bcb5f7e071c"
+      }
+    },
+    "playwright": {
+      "command": "npx",
+      "args": [
+        "@playwright/mcp@latest"
+      ]
+    },
     "chrome-devtools": {
       "command": "npx",
       "args": [

@@ -27,7 +27,7 @@ const FIELD_OPTIONS = [
 ]
 
 export function CSVUpload() {
-  const { campaignData, updateCampaignData, nextStep } = useWizard()
+  const { campaignData: _campaignData, updateCampaignData, nextStep } = useWizard()
   const [isDragging, setIsDragging] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [parseError, setParseError] = useState(null)
@@ -67,7 +67,8 @@ export function CSVUpload() {
           fileName: file.name,
           rowCount: results.data.length,
           columns: results.meta.fields,
-          data: results.data.slice(0, 5) // Preview first 5 rows
+          preview: results.data.slice(0, 5), // Preview first 5 rows
+          allData: results.data // Store all data
         })
         
         // Auto-detect column mappings
@@ -124,8 +125,8 @@ export function CSVUpload() {
   }
 
   const handleConfirm = () => {
-    // Transform parsed data into leads using mapping
-    const leads = parsedData.data.map((row, index) => {
+    // Transform ALL parsed data into leads using mapping
+    const leads = parsedData.allData.map((row, index) => {
       const lead = { id: `lead-${index}` }
       Object.entries(columnMapping).forEach(([csvCol, field]) => {
         if (field !== 'doNotImport') {
@@ -192,12 +193,19 @@ export function CSVUpload() {
             onChange={(e) => handleFile(e.target.files[0])}
             className="hidden"
             id="csv-input"
+            ref={(input) => {
+              if (input) {
+                window.csvInputRef = input
+              }
+            }}
           />
-          <label htmlFor="csv-input">
-            <Button variant="outline" className="cursor-pointer">
-              Browse Files
-            </Button>
-          </label>
+          <Button 
+            variant="outline" 
+            className="cursor-pointer"
+            onClick={() => document.getElementById('csv-input')?.click()}
+          >
+            Browse Files
+          </Button>
           <p className="text-xs text-muted-foreground mt-4">
             Maximum file size: 10MB
           </p>
@@ -225,7 +233,7 @@ export function CSVUpload() {
         <h3 className="text-lg font-semibold">Map Your Lead Columns</h3>
         <p className="text-sm text-muted-foreground">
           Review and adjust the column mappings for your imported leads. 
-          <span className="text-primary">LinkedIn URL is required.</span>
+          <span className="text-primary"> LinkedIn URL is required.</span>
         </p>
 
         <Card className="overflow-hidden">
@@ -253,7 +261,7 @@ export function CSVUpload() {
                     </select>
                   </td>
                   <td className="p-3 text-muted-foreground truncate max-w-xs">
-                    {parsedData.data[0]?.[col] || 'No data'}
+                    {parsedData.preview[0]?.[col] || 'No data'}
                   </td>
                 </tr>
               ))}
@@ -261,7 +269,38 @@ export function CSVUpload() {
           </table>
         </Card>
 
-        <div className="flex items-center justify-between">
+        {/* Preview All Leads */}
+        <div className="space-y-2">
+          <h4 className="text-sm font-medium">Preview Leads ({parsedData.rowCount} total)</h4>
+          <Card className="overflow-hidden">
+            <div className="max-h-96 overflow-y-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-muted/50 border-b sticky top-0">
+                  <tr>
+                    {parsedData.columns.map((col) => (
+                      <th key={col} className="text-left p-3 font-medium text-xs">
+                        {col}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {parsedData.allData.map((row, idx) => (
+                    <tr key={idx} className="border-b last:border-b-0 hover:bg-muted/30">
+                      {parsedData.columns.map((col) => (
+                        <td key={col} className="p-3 text-muted-foreground truncate max-w-xs">
+                          {row[col] || '-'}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        </div>
+
+        <div className="flex items-center justify-between pt-4 border-t">
           <p className="text-sm text-muted-foreground">
             {hasRequiredMapping ? (
               <span className="text-green-500 flex items-center gap-1">

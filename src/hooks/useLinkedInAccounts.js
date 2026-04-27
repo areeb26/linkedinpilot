@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { useWorkspaceStore } from '@/store/workspaceStore'
 import { useAuthStore } from '@/store/authStore'
 import { format } from 'date-fns'
+import { toast } from 'react-hot-toast'
 
 export function useLinkedInAccounts() {
   const { workspaceId } = useWorkspaceStore()
@@ -66,7 +67,7 @@ export function useAddAccount() {
       return data
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(['linkedin-accounts', workspaceId])
+      queryClient.invalidateQueries({ queryKey: ['linkedin-accounts', workspaceId] })
     }
   })
 }
@@ -88,7 +89,7 @@ export function useUpdateAccount() {
       return data
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(['linkedin-accounts', workspaceId])
+      queryClient.invalidateQueries({ queryKey: ['linkedin-accounts', workspaceId] })
     }
   })
 }
@@ -111,7 +112,7 @@ export function useToggleAccount() {
       return data
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(['linkedin-accounts', workspaceId])
+      queryClient.invalidateQueries({ queryKey: ['linkedin-accounts', workspaceId] })
     }
   })
 }
@@ -122,16 +123,19 @@ export function useDeleteAccount() {
 
   return useMutation({
     mutationFn: async (id) => {
+      if (!workspaceId) throw new Error('No workspace selected')
       const { error } = await supabase
         .from('linkedin_accounts')
         .delete()
         .eq('id', id)
+        .eq('workspace_id', workspaceId)
 
       if (error) throw error
       return id
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(['linkedin-accounts', workspaceId])
+      queryClient.invalidateQueries({ queryKey: ['linkedin-accounts', workspaceId] })
     }
   })
 }
+

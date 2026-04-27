@@ -109,8 +109,15 @@ export default function LeadUploadModal({ campaignId, onClose }) {
   }
 
   const handleImport = async () => {
-    await uploadLeads.mutateAsync({ campaignId, leads: parsedLeads })
-    onClose()
+    try {
+      console.log('[LeadUploadModal] Starting import...', { campaignId, leadsCount: parsedLeads.length })
+      await uploadLeads.mutateAsync({ campaignId, leads: parsedLeads })
+      console.log('[LeadUploadModal] Import successful')
+      onClose()
+    } catch (error) {
+      console.error('[LeadUploadModal] Import failed:', error)
+      setError(error.message || 'Failed to import leads')
+    }
   }
 
   return (
@@ -205,6 +212,13 @@ export default function LeadUploadModal({ campaignId, onClose }) {
                 <p className="text-muted-foreground text-xs mt-2">
                   …and {parsedLeads.length - 5} more
                 </p>
+              )}
+
+              {error && (
+                <div className="mt-3 flex items-center gap-2 text-destructive text-sm bg-destructive/10 p-3 rounded-lg">
+                  <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                  {error}
+                </div>
               )}
 
               <div className="flex items-center justify-between mt-5">

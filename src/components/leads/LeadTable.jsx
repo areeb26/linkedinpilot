@@ -1,78 +1,102 @@
 import React from 'react'
-import { 
-  Table, TableHeader, TableRow, TableHead, TableBody, TableCell 
+import {
+  Table, TableHeader, TableRow, TableHead, TableBody, TableCell
 } from '@/components/ui/table'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { 
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger 
+import { Skeleton } from '@/components/ui/skeleton'
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
-import { User, MoreHorizontal } from 'lucide-react'
+import { User, MoreHorizontal, UserPlus, MessageSquare, Eye } from 'lucide-react'
 import { format } from 'date-fns'
 
-export function LeadTable({ 
-  leads, 
-  isLoading, 
-  selectedIds, 
-  onSelectRow, 
+export function LeadTable({
+  leads,
+  isLoading,
+  selectedIds,
+  onSelectRow,
   onSelectAll,
-  onDeleteLead
+  onDeleteLead,
+  onViewProfile,
+  onSendInvite,
+  onSendMessage,
 }) {
   const getIcpBadge = (score) => {
-    if (score === undefined || score === null) return <Badge className="bg-white/5 text-[#94a3b8] border-white/10">—</Badge>
-    if (score >= 70) return <Badge className="bg-green-500/10 text-green-500 border-green-500/20">High</Badge>
-    if (score >= 40) return <Badge className="bg-yellow-500/10 text-yellow-500 border-yellow-500/20">Medium</Badge>
-    return <Badge className="bg-red-500/10 text-red-500 border-red-500/20">Low</Badge>
+    if (score === undefined || score === null)
+      return <Badge className="bg-[var(--color-border)] text-[var(--color-text-secondary)] border-[var(--color-border)]">—</Badge>
+    if (score >= 70)
+      return <Badge className="bg-[oklch(var(--success)/0.1)] text-[oklch(var(--success))] border-[oklch(var(--success)/0.2)]">High</Badge>
+    if (score >= 40)
+      return <Badge className="bg-[oklch(var(--warning)/0.1)] text-[oklch(var(--warning))] border-[oklch(var(--warning)/0.2)]">Medium</Badge>
+    return <Badge className="bg-[oklch(var(--destructive)/0.1)] text-[oklch(var(--destructive))] border-[oklch(var(--destructive)/0.2)]">Low</Badge>
   }
 
   return (
-    <div className="rounded-lg border border-white/5 bg-[#1e1e1e] overflow-hidden">
+    <div className="rounded-xs border border-[var(--color-border)] bg-[var(--color-surface-strong)] overflow-hidden">
       <Table>
         <TableHeader>
-          <TableRow>
+          <TableRow className="border-[var(--color-border)]">
             <TableHead className="w-12">
-              <Checkbox 
-                checked={selectedIds.length === leads.length && leads.length > 0} 
-                onCheckedChange={onSelectAll} 
+              <Checkbox
+                checked={selectedIds.length === leads.length && leads.length > 0}
+                onCheckedChange={onSelectAll}
               />
             </TableHead>
-            <TableHead>Lead</TableHead>
-            <TableHead>Company</TableHead>
-            <TableHead>ICP</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Date</TableHead>
+            <TableHead className="text-[var(--color-text-secondary)]">Lead</TableHead>
+            <TableHead className="text-[var(--color-text-secondary)]">Company</TableHead>
+            <TableHead className="text-[var(--color-text-secondary)]">ICP</TableHead>
+            <TableHead className="text-[var(--color-text-secondary)]">Status</TableHead>
+            <TableHead className="text-[var(--color-text-secondary)]">Date</TableHead>
             <TableHead className="w-12"></TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {isLoading ? (
-            <TableRow>
-              <TableCell colSpan={7} className="h-32 text-center text-[#94a3b8]">
-                <div className="flex flex-col items-center gap-2">
-                  <div className="h-4 w-4 border-2 border-purple-500 border-t-transparent animate-spin rounded-full" />
-                  <span>Loading leads...</span>
-                </div>
-              </TableCell>
-            </TableRow>
+            <>
+              {[...Array(5)].map((_, i) => (
+                <TableRow key={i} className="border-[var(--color-border)]">
+                  <TableCell><Skeleton className="h-4 w-4" /></TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-3">
+                      <Skeleton className="h-10 w-10 rounded-full" />
+                      <div className="space-y-2">
+                        <Skeleton className="h-4 w-32" />
+                        <Skeleton className="h-3 w-48" />
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-28" /></TableCell>
+                  <TableCell><Skeleton className="h-5 w-16 rounded-full" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-12" /></TableCell>
+                  <TableCell><Skeleton className="h-8 w-8 rounded" /></TableCell>
+                </TableRow>
+              ))}
+            </>
           ) : leads.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={7} className="h-32 text-center text-[#94a3b8]">
+              <TableCell colSpan={7} className="h-32 text-center text-[var(--color-text-secondary)]">
                 No leads found.
               </TableCell>
             </TableRow>
           ) : (
             leads.map(lead => (
-              <TableRow key={lead.id || lead.profile_url} data-state={selectedIds.includes(lead.id) && "selected"}>
+              <TableRow
+                key={lead.id || lead.profile_url}
+                className="border-[var(--color-border)] hover:bg-[var(--color-border)]"
+                data-state={selectedIds.includes(lead.id) && 'selected'}
+              >
                 <TableCell>
-                  <Checkbox 
-                    checked={selectedIds.includes(lead.id)} 
-                    onCheckedChange={(checked) => onSelectRow(lead.id, checked)} 
+                  <Checkbox
+                    checked={selectedIds.includes(lead.id)}
+                    onCheckedChange={(checked) => onSelectRow(lead.id, checked)}
                   />
                 </TableCell>
                 <TableCell>
-                  <div className="flex items-center gap-3">
-                    <div className="h-8 w-8 rounded-full bg-purple-500/20 flex items-center justify-center text-purple-400 overflow-hidden font-bold flex-shrink-0">
+                  <div className="flex items-center gap-[var(--space-2)]">
+                    <div className="h-8 w-8 rounded-xs bg-[var(--color-surface-raised)]/10 flex items-center justify-center text-[var(--color-surface-raised)] overflow-hidden font-bold flex-shrink-0">
                       {lead.avatar_url ? (
                         <img src={lead.avatar_url} alt="" className="h-full w-full object-cover" />
                       ) : (
@@ -80,36 +104,72 @@ export function LeadTable({
                       )}
                     </div>
                     <div className="min-w-0">
-                      <div className="font-medium text-white truncate">
+                      <div className="font-medium text-[var(--color-text-on-strong)] truncate">
                         {lead.profile_url ? (
-                          <a href={lead.profile_url} target="_blank" rel="noopener noreferrer" className="hover:text-purple-400 transition-colors">
+                          <a
+                            href={lead.profile_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="hover:text-[var(--color-surface-raised)] transition-colors"
+                          >
                             {lead.full_name}
                           </a>
                         ) : lead.full_name}
                       </div>
-                      <div className="text-xs text-[#94a3b8] truncate">{lead.title || lead.headline || ''}</div>
+                      <div className="text-xs text-[var(--color-text-secondary)] truncate">{lead.title || lead.headline || ''}</div>
                     </div>
                   </div>
                 </TableCell>
-                <TableCell className="text-[#94a3b8]">{lead.company || '—'}</TableCell>
+                <TableCell className="text-[var(--color-text-secondary)]">{lead.company || '—'}</TableCell>
                 <TableCell>{getIcpBadge(lead.icp_score)}</TableCell>
                 <TableCell>
-                  <Badge variant="outline" className="capitalize border-white/10 text-[#94a3b8]">
+                  <Badge variant="outline" className="capitalize border-[var(--color-border)] text-[var(--color-text-secondary)]">
                     {lead.connection_status || lead.status || 'new'}
                   </Badge>
                 </TableCell>
-                <TableCell className="text-[#94a3b8] text-xs">
+                <TableCell className="text-[var(--color-text-secondary)] text-xs">
                   {lead.created_at ? format(new Date(lead.created_at), 'MMM d, yyyy') : '—'}
                 </TableCell>
                 <TableCell>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-[#94a3b8] hover:text-white">
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-[var(--color-text-secondary)] hover:text-[var(--color-text-on-strong)]">
                         <MoreHorizontal className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem className="text-red-400 focus:text-red-400" onClick={() => onDeleteLead(lead.id)}>
+                    <DropdownMenuContent align="end" className="bg-[var(--color-surface-strong)] border-[var(--color-border)] rounded-xs">
+                      {onViewProfile && (
+                        <DropdownMenuItem
+                          className="text-[var(--color-text-on-strong)] focus:bg-[var(--color-border)] cursor-pointer"
+                          onClick={() => onViewProfile(lead)}
+                        >
+                          <Eye className="h-4 w-4 mr-2" />
+                          View Profile
+                        </DropdownMenuItem>
+                      )}
+                      {onSendInvite && (
+                        <DropdownMenuItem
+                          className="text-[var(--color-text-on-strong)] focus:bg-[var(--color-border)] cursor-pointer"
+                          onClick={() => onSendInvite(lead)}
+                        >
+                          <UserPlus className="h-4 w-4 mr-2" />
+                          Send Invite
+                        </DropdownMenuItem>
+                      )}
+                      {onSendMessage && (
+                        <DropdownMenuItem
+                          className="text-[var(--color-text-on-strong)] focus:bg-[var(--color-border)] cursor-pointer"
+                          onClick={() => onSendMessage(lead)}
+                        >
+                          <MessageSquare className="h-4 w-4 mr-2" />
+                          Send Message
+                        </DropdownMenuItem>
+                      )}
+                      <DropdownMenuSeparator className="bg-[var(--color-border)]" />
+                      <DropdownMenuItem
+                        className="text-[oklch(var(--destructive))] focus:text-[oklch(var(--destructive))] cursor-pointer"
+                        onClick={() => onDeleteLead(lead.id)}
+                      >
                         Delete Lead
                       </DropdownMenuItem>
                     </DropdownMenuContent>

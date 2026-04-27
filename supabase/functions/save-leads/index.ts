@@ -1,6 +1,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders, handleCors } from '../_shared/cors.ts'
+import { resolveAuth } from '../_shared/auth.ts'
 
 /**
  * save-leads — upserts scraped leads and optionally updates an action_queue row.
@@ -33,6 +34,28 @@ serve(async (req) => {
       })
     }
 
+    const { userId, error: authError } = await resolveAuth(req, supabase, workspace_id)
+    if (authError || !userId) {
+      return new Response(JSON.stringify({ error: authError || 'Unauthorized' }), {
+        status: 401,
+        headers: corsHeaders,
+      })
+    }
+
+    const { data: member } = await supabase
+      .from('team_members')
+      .select('workspace_id')
+      .eq('user_id', userId)
+      .eq('workspace_id', workspace_id)
+      .single()
+
+    if (!member) {
+      return new Response(JSON.stringify({ error: 'Forbidden' }), {
+        status: 403,
+        headers: corsHeaders,
+      })
+    }
+
     let savedCount = 0
     const savedLeadIds: string[] = []
 
@@ -54,9 +77,8 @@ serve(async (req) => {
           avatar_url: l.avatar_url || null,
           linkedin_member_id: l.member_id || null,
           industry: l.industry || null,
-          source: l.source || 'lead-extractor',
+          source: l.source || 'prospect-extractor',
           connection_status: l.connection_status || 'none',
-          status: 'new',
         }))
 
       if (rows.length > 0) {

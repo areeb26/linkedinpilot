@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useCreateAutomation, useUpdateAutomation } from "@/hooks/useAutomations"
 import { useLinkedInAccounts } from "@/hooks/useLinkedInAccounts"
 import { useCampaigns } from "@/hooks/useCampaigns"
-import { Loader2, Zap, Save, Trash2 } from "lucide-react"
+import { Loader2, Zap, Save } from "lucide-react"
 
 const automationSchema = z.object({
   name: z.string().min(3, "Name must be at least 3 characters"),

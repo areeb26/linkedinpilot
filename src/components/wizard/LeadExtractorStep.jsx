@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { Search, Filter, ChevronLeft, ChevronRight, Loader2, Plus } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Loader2, Plus } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 
 export function LeadExtractorStep() {
@@ -26,15 +26,18 @@ export function LeadExtractorStep() {
     if (selectedExtractionId && extractionLeads.length > 0) {
       // Transform leads to match wizard format
       const formattedLeads = extractionLeads.map((lead, index) => ({
-        id: `extracted-${index}`,
+        id: lead.id || `extracted-${index}`,
         firstName: lead.first_name || lead.firstName || '',
         lastName: lead.last_name || lead.lastName || '',
-        linkedInUrl: lead.linkedin_url || lead.linkedInUrl || '',
+        full_name: lead.full_name || [lead.first_name, lead.last_name].filter(Boolean).join(' ') || '',
+        linkedInUrl: lead.profile_url || lead.linkedin_url || lead.linkedInUrl || '',
         company: lead.company || '',
         jobTitle: lead.title || lead.jobTitle || '',
         email: lead.email || '',
         location: lead.location || '',
-        source: 'lead-extractor'
+        headline: lead.headline || '',
+        avatar_url: lead.avatar_url || '',
+        source: 'prospect-extractor'
       }))
 
       updateCampaignData({
@@ -81,7 +84,7 @@ export function LeadExtractorStep() {
 
         <Card className="p-8 text-center">
           <p className="text-muted-foreground mb-4">
-            Use the Lead Extractor page to create a new extraction, then return here to select it.
+            Use the Prospect Extractor page to create a new extraction, then return here to select it.
           </p>
           <Button onClick={() => setShowNewExtraction(false)}>
             Back to Extraction List

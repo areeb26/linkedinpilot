@@ -1,6 +1,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders, handleCors } from '../_shared/cors.ts'
+import { resolveAuth } from '../_shared/auth.ts'
 
 serve(async (req) => {
   const corsResponse = handleCors(req)
@@ -12,26 +13,23 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser(
-      req.headers.get('authorization')?.split(' ')[1] || ''
-    )
+    const body = await req.json()
+    const { workspace_id, account_data, encrypted_credentials, worker_url } = body
 
-    if (authError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+    const { userId, error: authError } = await resolveAuth(req, supabase, workspace_id)
+    if (authError || !userId) {
+      return new Response(JSON.stringify({ error: authError || 'Unauthorized' }), {
         status: 401,
         headers: corsHeaders,
       })
     }
-
-    const body = await req.json()
-    const { workspace_id, account_data, encrypted_credentials, worker_url } = body
 
     // Verify user is member of workspace
     const { data: teamMember } = await supabase
       .from('team_members')
       .select('role')
       .eq('workspace_id', workspace_id)
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .single()
 
     if (!teamMember) {
@@ -47,7 +45,7 @@ serve(async (req) => {
       .insert({
         ...account_data,
         workspace_id,
-        user_id: user.id,
+        user_id: userId,
         ...encrypted_credentials,
       })
       .select()

@@ -92,7 +92,7 @@ export function LinkedInAccountsStep() {
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <Save className="w-5 h-5 text-primary" />
-            <h3 className="text-lg font-semibold">Limit ranges</h3>
+            <h3 className="text-lg font-semibold">Rate Limits</h3>
           </div>
           <Button 
             size="sm" 
@@ -101,39 +101,82 @@ export function LinkedInAccountsStep() {
               accountLimits: {
                 connectionRequests: 20,
                 messages: 20,
-                postLikes: 20
+                postLikes: 20,
+                weeklyConnectionRequests: 200
               }
             })}
           >
-            Reset
+            Reset to Safe Defaults
           </Button>
         </div>
-        <p className="text-sm text-muted-foreground mb-6">
-          Set daily limits for your LinkedIn activities to maintain a natural profile behavior. These limits apply per account.
+        <p className="text-sm text-muted-foreground mb-2">
+          Set daily and weekly limits to maintain natural profile behavior and comply with LinkedIn's restrictions.
         </p>
+        <div className="mb-6 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+          <p className="text-xs text-amber-700 dark:text-amber-400">
+            ⚠️ <strong>LinkedIn Limits:</strong> Max 100 connection requests/day and 200/week. 
+            Exceeding these may result in account restrictions.
+          </p>
+        </div>
 
         <Card className="p-6 space-y-8">
-          <LimitSlider
-            label="Connection request limit (per account)"
-            value={campaignData.accountLimits.connectionRequests}
-            onChange={(v) => updateLimit('connectionRequests', v)}
-            min={1}
-            max={100}
-          />
-          <LimitSlider
-            label="Send message limit (per account)"
-            value={campaignData.accountLimits.messages}
-            onChange={(v) => updateLimit('messages', v)}
-            min={1}
-            max={100}
-          />
-          <LimitSlider
-            label="Like post limit (per account)"
-            value={campaignData.accountLimits.postLikes}
-            onChange={(v) => updateLimit('postLikes', v)}
-            min={1}
-            max={50}
-          />
+          <div className="space-y-6">
+            <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Daily Limits (per account)</h4>
+            <LimitSlider
+              label="Connection Requests"
+              value={campaignData.accountLimits.connectionRequests}
+              onChange={(v) => updateLimit('connectionRequests', v)}
+              min={1}
+              max={100}
+              recommended={20}
+              description="Safe: 20-50/day. Max: 100/day"
+            />
+            <LimitSlider
+              label="Messages Sent"
+              value={campaignData.accountLimits.messages}
+              onChange={(v) => updateLimit('messages', v)}
+              min={1}
+              max={100}
+              recommended={20}
+              description="Safe: 20-50/day"
+            />
+            <LimitSlider
+              label="Post Likes"
+              value={campaignData.accountLimits.postLikes}
+              onChange={(v) => updateLimit('postLikes', v)}
+              min={1}
+              max={50}
+              recommended={20}
+              description="Safe: 10-30/day"
+            />
+          </div>
+
+          <div className="pt-6 border-t space-y-6">
+            <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Weekly Limits</h4>
+            <LimitSlider
+              label="Connection Requests (Weekly)"
+              value={campaignData.accountLimits.weeklyConnectionRequests || 200}
+              onChange={(v) => updateLimit('weeklyConnectionRequests', v)}
+              min={50}
+              max={200}
+              recommended={200}
+              description="LinkedIn enforces 200 connection requests per week"
+            />
+          </div>
+
+          <div className="pt-6 border-t">
+            <div className="flex items-start gap-3 p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+              <div className="text-blue-600 dark:text-blue-400 text-sm">
+                <p className="font-medium mb-1">✨ Smart Rate Limiting Active</p>
+                <ul className="text-xs space-y-1 opacity-90">
+                  <li>• Actions spread across working hours with random timing</li>
+                  <li>• Cross-campaign tracking prevents limit violations</li>
+                  <li>• Auto-retry when rate limits are hit</li>
+                  <li>• Natural 30-90 second delays between actions</li>
+                </ul>
+              </div>
+            </div>
+          </div>
         </Card>
       </section>
 
@@ -161,14 +204,30 @@ export function LinkedInAccountsStep() {
   )
 }
 
-function LimitSlider({ label, value, onChange, min, max }) {
+function LimitSlider({ label, value, onChange, min, max, recommended, description }) {
+  const isRecommended = value <= recommended
+  
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <label className="text-sm font-medium">{label}</label>
-        <span className="text-sm font-semibold bg-primary/10 px-2 py-1 rounded">
-          {value}
-        </span>
+        <div className="flex-1">
+          <label className="text-sm font-medium">{label}</label>
+          {description && (
+            <p className="text-xs text-muted-foreground mt-0.5">{description}</p>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          {recommended && value > recommended && (
+            <span className="text-xs text-amber-600 dark:text-amber-400">⚠️ High</span>
+          )}
+          <span className={`text-sm font-semibold px-2 py-1 rounded ${
+            isRecommended 
+              ? 'bg-green-500/10 text-green-700 dark:text-green-400' 
+              : 'bg-amber-500/10 text-amber-700 dark:text-amber-400'
+          }`}>
+            {value}
+          </span>
+        </div>
       </div>
       <input
         type="range"
@@ -180,6 +239,11 @@ function LimitSlider({ label, value, onChange, min, max }) {
       />
       <div className="flex justify-between text-xs text-muted-foreground">
         <span>{min}</span>
+        {recommended && (
+          <span className="text-green-600 dark:text-green-400">
+            Recommended: {recommended}
+          </span>
+        )}
         <span>{max}</span>
       </div>
     </div>

@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware'
 
 export const useWorkspaceStore = create(
   persist(
-    (set, get) => ({
+    (set, _get) => ({
       workspaceId: null,
       workspaceName: null,
       workspaces: [],

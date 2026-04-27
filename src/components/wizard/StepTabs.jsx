@@ -17,10 +17,13 @@ const STEP_LABELS = {
 }
 
 export function StepTabs() {
-  const { currentStep, goToStep, campaignData } = useWizard()
+  const { currentStep, goToStep, campaignData, isNew } = useWizard()
 
   const isStepEnabled = (index) => {
-    // Allow navigating to completed steps
+    // For existing campaigns, allow navigation to all steps
+    if (!isNew) return true
+    
+    // For new campaigns, allow navigating to completed steps or if leads are added
     return index <= currentStep || campaignData.leads.length > 0
   }
 

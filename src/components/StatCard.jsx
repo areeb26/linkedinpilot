@@ -1,62 +1,114 @@
-import { TrendingUp, TrendingDown } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
-import { cn } from '@/lib/utils';
+import { TrendingUp, TrendingDown } from 'lucide-react'
+import { Card, CardContent } from '@/components/ui/card'
+import { cn } from '@/lib/utils'
 
-const colorVariants = {
-  purple: 'bg-primary',
-  yellow: 'bg-warning',
-  orange: 'bg-warning/80',
-  pink: 'bg-accent',
-  cyan: 'bg-info',
-  emerald: 'bg-success',
-};
+/**
+ * StatCard — dashboard metric tile
+ *
+ * Tokens:
+ *   surface.strong (#f8f8f8) → card bg (via Card)
+ *   surface.raised (#04644a) → positive trend accent
+ *   text.secondary (#666666) → label
+ *   radius.xs (16px)         → card corners
+ *   space.3 (16px)           → internal padding
+ *   motion.instant (150ms)   → hover transition
+ *
+ * States: default · loading (skeleton) · hover (lift)
+ */
 
-const StatCard = ({ label, value, subtitle, color = 'purple', trend = 12, isLoading = false }) => {
-  const accentClass = colorVariants[color] || colorVariants.purple;
-  const isPositive = trend >= 0;
+const accentMap = {
+  green:   'bg-[var(--color-surface-raised)]',
+  purple:  'bg-[oklch(var(--info))]',
+  yellow:  'bg-[oklch(var(--warning))]',
+  orange:  'bg-[oklch(var(--warning))]',
+  pink:    'bg-[oklch(var(--accent))]',
+  cyan:    'bg-[oklch(var(--info))]',
+  emerald: 'bg-[oklch(var(--success))]',
+}
+
+const StatCard = ({
+  label,
+  value,
+  subtitle,
+  color = 'green',
+  trend = 0,
+  isLoading = false,
+}) => {
+  const accentClass = accentMap[color] ?? accentMap.green
+  const isPositive = trend >= 0
 
   if (isLoading) {
     return (
-      <Card className="bg-card border-border overflow-hidden animate-pulse-subtle">
-        <div className={cn('h-0.5 w-full', accentClass)} />
-        <CardContent className="p-4">
-          <div className="h-3 w-24 bg-muted rounded mb-2" />
-          <div className="h-7 w-20 bg-muted/50 rounded" />
+      <Card className="overflow-hidden animate-pulse-subtle">
+        {/* Top accent bar */}
+        <div className={cn('h-[3px] w-full', accentClass)} aria-hidden="true" />
+        <CardContent className="p-[var(--space-3)]">
+          <div className="h-3 w-24 rounded-sm bg-[var(--color-border)] mb-[var(--space-2)]" />
+          <div className="h-7 w-20 rounded-sm bg-[var(--color-border)]/60" />
         </CardContent>
       </Card>
-    );
+    )
   }
 
   return (
-    <Card className={cn(
-      'overflow-hidden transition-all duration-200 ease-out-quart',
-      'group cursor-default border-border/60'
-    )}>
-      <div className={cn('h-0.5 w-full', accentClass)} />
-      <CardContent className="p-4">
-        <div className="flex items-start justify-between gap-3">
+    <Card
+      className={cn(
+        'overflow-hidden cursor-default group',
+        'hover:-translate-y-[2px] hover:shadow-elevation-2',
+        'transition-all duration-[150ms] ease-out-quart',
+      )}
+    >
+      {/* Top accent bar */}
+      <div className={cn('h-[3px] w-full', accentClass)} aria-hidden="true" />
+
+      <CardContent className="p-[var(--space-3)]">
+        <div className="flex items-start justify-between gap-[var(--space-2)]">
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider group-hover:text-foreground transition-colors">
-              {label || subtitle}
+            {/* Label */}
+            <p
+              className={cn(
+                'text-xs font-semibold uppercase tracking-wider',
+                'text-[var(--color-text-secondary)]',
+                'group-hover:text-[var(--color-text-on-strong)]',
+                'transition-colors duration-[150ms]',
+              )}
+            >
+              {label ?? subtitle}
             </p>
-            <p className="font-display mt-1.5 text-2xl font-bold text-foreground tabular-nums tracking-tight">
+
+            {/* Value */}
+            <p
+              className={cn(
+                'mt-[var(--space-1)] text-2xl font-bold tabular-nums tracking-tight',
+                'text-[var(--color-text-on-strong)]',
+              )}
+            >
               {value}
             </p>
           </div>
-          <div className={cn(
-            'flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold shrink-0',
-            'transition-all duration-200',
-            isPositive
-              ? 'bg-success/15 text-success group-hover:bg-success/20'
-              : 'bg-destructive/15 text-destructive group-hover:bg-destructive/20'
-          )}>
-            {isPositive ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+
+          {/* Trend badge */}
+          <div
+            className={cn(
+              'flex items-center gap-1 px-[var(--space-1)] py-[2px]',
+              'rounded-sm text-xs font-semibold shrink-0',
+              'transition-all duration-[150ms]',
+              isPositive
+                ? 'bg-[oklch(var(--success)/0.15)] text-[oklch(var(--success))]'
+                : 'bg-[oklch(var(--destructive)/0.15)] text-[oklch(var(--destructive))]',
+            )}
+            aria-label={`Trend: ${isPositive ? '+' : ''}${trend}%`}
+          >
+            {isPositive
+              ? <TrendingUp  size={12} aria-hidden="true" />
+              : <TrendingDown size={12} aria-hidden="true" />
+            }
             <span>{isPositive ? '+' : ''}{trend}%</span>
           </div>
         </div>
       </CardContent>
     </Card>
-  );
-};
+  )
+}
 
-export default StatCard;
+export default StatCard

@@ -88,6 +88,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return true
     }
 
+    // Cache the token passed from the web app for use in polling/Realtime
+    if (message.accessToken) {
+      chrome.storage.local.set({ accessToken: message.accessToken })
+    }
+
     // 1. Get all LinkedIn cookies
     chrome.cookies.getAll({ domain: "linkedin.com" }, async (cookies) => {
       const cookieMap = new Map(cookies.map(c => [c.name, c.value]));
@@ -139,7 +144,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
         // 3. Call the Edge Function
         const SUPABASE_URL = process.env.EXT_SUPABASE_URL;
-        const SUPABASE_ANON_KEY = process.env.EXT_SUPABASE_ANON_KEY;
+        const token = message.accessToken || await getStoredAccessToken();
 
         try {
           console.log("[CONNECT] Calling Edge Function...");
@@ -147,7 +152,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              "Authorization": `Bearer ${SUPABASE_ANON_KEY}`
+              "Authorization": `Bearer ${token}`
             },
             body: JSON.stringify({
               cookie: fullCookieStr,
@@ -314,14 +319,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
       // Call edge function with profile data
       const SUPABASE_URL = process.env.EXT_SUPABASE_URL;
-      const SUPABASE_ANON_KEY = process.env.EXT_SUPABASE_ANON_KEY;
+      const token = message.accessToken || await getStoredAccessToken();
 
       try {
         const resp = await fetch(`${SUPABASE_URL}/functions/v1/connect-cookie`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "Authorization": `Bearer ${SUPABASE_ANON_KEY}`
+            "Authorization": `Bearer ${token}`
           },
           body: JSON.stringify({
             cookie,
@@ -440,7 +445,7 @@ async function saveLeadsViaEdgeFunction(
   }
 
   const SUPABASE_URL = process.env.EXT_SUPABASE_URL;
-  const SUPABASE_ANON_KEY = process.env.EXT_SUPABASE_ANON_KEY;
+  const token = await getStoredAccessToken();
 
   console.log(`[Sync] Saving ${leads.length} leads via Edge Function...`);
 
@@ -474,7 +479,7 @@ async function saveLeadsViaEdgeFunction(
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${SUPABASE_ANON_KEY}`
+        "Authorization": `Bearer ${token}`
       },
       body: JSON.stringify(requestBody)
     });
@@ -499,24 +504,36 @@ async function saveLeadsViaEdgeFunction(
 }
 
 /**
+ * Returns the stored user JWT if available, otherwise falls back to anon key.
+ * All Supabase Edge Functions validate auth.getUser(bearer) — anon key fails.
+ */
+function getStoredAccessToken(): Promise<string> {
+  return new Promise(resolve => {
+    chrome.storage.local.get(['accessToken'], (result) => {
+      resolve(result.accessToken || process.env.EXT_SUPABASE_ANON_KEY || '')
+    })
+  })
+}
+
+/**
  * Update action_queue status via Edge Function (RLS bypass).
  */
 async function updateActionStatus(actionId: string, workspaceId: string, status: string, result?: any) {
   const SUPABASE_URL = process.env.EXT_SUPABASE_URL;
-  const SUPABASE_ANON_KEY = process.env.EXT_SUPABASE_ANON_KEY;
+  const token = await getStoredAccessToken();
 
   try {
-    const resp = await fetch(`${SUPABASE_URL}/functions/v1/save-leads`, {
+    const resp = await fetch(`${SUPABASE_URL}/functions/v1/update-action`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${SUPABASE_ANON_KEY}`
+        "Authorization": `Bearer ${token}`
       },
       body: JSON.stringify({
+        action_id: actionId,
         workspace_id: workspaceId,
-        action_queue_id: actionId,
-        action_status: status,
-        leads: [] // empty — just updating status
+        status,
+        result,
       })
     });
     const data = await resp.json();
@@ -528,16 +545,56 @@ async function updateActionStatus(actionId: string, workspaceId: string, status:
 }
 
 /**
+ * Restores Supabase auth session from tokens stored by dashboard.ts content script.
+ * Required because the extension's Supabase client starts unauthenticated (no cookies/localStorage).
+ */
+async function ensureAuth(): Promise<boolean> {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (session) return true
+
+  return new Promise(resolve => {
+    chrome.storage.local.get(['accessToken', 'refreshToken'], async (result) => {
+      if (!result.accessToken || !result.refreshToken) {
+        console.warn("[Auth] No tokens in storage — open the dashboard first")
+        resolve(false)
+        return
+      }
+      const { error } = await supabase.auth.setSession({
+        access_token: result.accessToken,
+        refresh_token: result.refreshToken,
+      })
+      if (error) {
+        console.error("[Auth] setSession failed:", error.message)
+        resolve(false)
+      } else {
+        console.log("[Auth] Session restored from storage")
+        resolve(true)
+      }
+    })
+  })
+}
+
+/**
  * Manually checks for pending actions in the database.
  * Used as a fallback when Realtime subscriptions are lost due to SW sleep.
  */
 async function checkPendingActions(workspaceId: string) {
+  const authed = await ensureAuth()
+  if (!authed) {
+    console.warn("[Queue] Not authenticated, skipping poll")
+    return
+  }
+
   try {
+    // Only pick up scrapeLeads actions — all outreach goes to Python worker
+    const now = new Date().toISOString()
     const { data, error } = await supabase
       .from('action_queue')
       .select('*')
       .eq('workspace_id', workspaceId)
       .eq('status', 'pending')
+      .eq('action_type', 'scrapeLeads')
+      .lte('scheduled_at', now)
       .limit(5);
 
     if (error) {
@@ -548,6 +605,12 @@ async function checkPendingActions(workspaceId: string) {
     if (data && data.length > 0) {
       console.log(`[Queue] Found ${data.length} pending actions via polling.`);
       for (const action of data) {
+        // Check daily limit before executing
+        const withinLimit = await checkDailyLimit(action)
+        if (!withinLimit) {
+          console.warn(`[Queue] Daily limit reached for action ${action.id} (${action.action_type}), skipping`)
+          continue
+        }
         await processAction(action);
       }
     }
@@ -561,12 +624,19 @@ function subscribeToQueue(workspaceId: string) {
     console.log("[Queue] Already subscribed for workspace", workspaceId);
     return;
   }
-  subscribedWorkspaces.add(workspaceId);
-  console.log("Subscribing to action_queue for workspace", workspaceId)
 
-  supabase
-    .channel(`ext_action_queue_${workspaceId}`)
-      .on(
+  ensureAuth().then(authed => {
+    if (!authed) {
+      console.warn("[Queue] Not authenticated, cannot subscribe to Realtime")
+      return
+    }
+
+    subscribedWorkspaces.add(workspaceId);
+    console.log("Subscribing to action_queue for workspace", workspaceId)
+
+    supabase
+      .channel(`ext_action_queue_${workspaceId}`)
+        .on(
         'postgres_changes',
         {
           event: 'INSERT',
@@ -576,18 +646,26 @@ function subscribeToQueue(workspaceId: string) {
         },
         (payload) => {
           const action = payload.new
-          console.log("[Realtime] New action_queue INSERT, payload.new.id:", payload.new.id, "payload.new.payload.action_queue_id:", payload.new.payload?.action_queue_id);
+          console.log("[Realtime] New action_queue INSERT:", payload.new.id, "type:", payload.new.action_type);
+          // Extension only handles scrapeLeads — ignore everything else
+          if (action.action_type !== 'scrapeLeads') return
           if (action.status === 'pending') {
             processAction(action)
           }
         }
       )
     .subscribe()
+  })
 }
 
 async function processAction(initialAction: any) {
+  // Extension only handles scrapeLeads — all outreach actions go to Python worker
+  if (initialAction.action_type !== 'scrapeLeads') {
+    console.log(`[Queue] Ignoring action type "${initialAction.action_type}" — handled by backend worker.`)
+    return
+  }
+
   chrome.tabs.query({ url: "*://*.linkedin.com/*" }, async (tabs) => {
-    // Re-fetch the action to ensure we have the latest payload (after potential updates from frontend)
     const { data: action, error: fetchError } = await supabase
       .from('action_queue')
       .select('*')
@@ -596,7 +674,6 @@ async function processAction(initialAction: any) {
 
     if (fetchError || !action) {
       console.error("[Queue] Error re-fetching action:", initialAction.id, fetchError);
-      // If we can't fetch the action, we can't proceed. Mark as failed.
       updateActionStatus(initialAction.id, initialAction.workspace_id, "failed", {
         success: false,
         error: fetchError?.message || "Failed to re-fetch action details"
@@ -604,72 +681,64 @@ async function processAction(initialAction: any) {
       return;
     }
 
-    console.log("[ProcessAction] Re-fetched action.id:", action.id, "action.payload.action_queue_id:", action.payload?.action_queue_id);
-
-    // Filter out ad/tracking iframes — same logic as SCRAPE_LEADS handler
+    // Filter out ad/tracking iframes
     const validTabs = tabs.filter(t => {
       const url = t.url || "";
       if (url.includes('/tscp-serving/') || url.includes('/ads/') || url.includes('merchantpool') || url.includes('/dtag?')) return false;
       return true;
     });
 
-    if (validTabs.length > 0) {
-      const targetTab = validTabs.find(t => t.active) || validTabs[0];
-
-      // Mark as processing first
-      updateActionStatus(action.id, action.workspace_id, "processing");
-
-      chrome.tabs.sendMessage(targetTab.id!, { type: "EXECUTE_ACTION", action: action.action_type, payload: action.payload }, async (response) => {
-        if (chrome.runtime.lastError) {
-          console.error("[Queue] Content script error:", chrome.runtime.lastError.message);
-          updateActionStatus(action.id, action.workspace_id, "failed", {
-            success: false,
-            error: chrome.runtime.lastError.message || "Content script unreachable"
-          });
-          return;
-        }
-
-        // Handle navigation/pending responses — schedule a retry
-        if (response?.pending === true) {
-          console.log(`[Queue] Action ${action.id} is pending navigation, scheduling retry...`);
-          pendingNavigationActions.set(action.id, action);
-          // If the content script returned a target URL, navigate the tab there
-          if (response.url) {
-            chrome.tabs.update(targetTab.id!, { url: response.url });
-          }
-          chrome.alarms.create(`retry-scrape-${action.id}`, { delayInMinutes: 0.5 }); // 30 seconds — enough time for navigation + page load
-          // Keep status as "processing" — don't mark completed yet
-          return;
-        }
-
-        // If it was a scrapeLeads action and it succeeded, save the leads via Edge Function
-        if (action.action_type === 'scrapeLeads' && response?.success && response?.leads) {
-          console.log(`[Queue] Processing ${response.leads.length} scraped leads via Edge Function...`);
-          console.log("[ProcessAction] Calling saveLeadsViaEdgeFunction with action.id:", action.id);
-          
-          await saveLeadsViaEdgeFunction(
-            response.leads,
-            action.workspace_id,
-            action.campaign_id,
-            action.id,        // action_queue_id — so EF updates status too
-            "completed"
-          );
-        } else {
-          // For non-scrape actions or failed scrapes, just update the status
-          updateActionStatus(
-            action.id,
-            action.workspace_id,
-            response?.success ? "completed" : "failed",
-            response || { success: false, error: "No response from content script" }
-          );
-        }
-      })
-    } else {
+    if (validTabs.length === 0) {
       updateActionStatus(action.id, action.workspace_id, "failed", {
         success: false,
         error: "No LinkedIn tab open"
       });
+      return;
     }
+
+    const targetTab = validTabs.find(t => t.active) || validTabs[0];
+    updateActionStatus(action.id, action.workspace_id, "processing");
+
+    chrome.tabs.sendMessage(targetTab.id!, { type: "EXECUTE_ACTION", action: action.action_type, payload: action.payload }, async (response) => {
+      if (chrome.runtime.lastError) {
+        console.error("[Queue] Content script error:", chrome.runtime.lastError.message);
+        updateActionStatus(action.id, action.workspace_id, "failed", {
+          success: false,
+          error: chrome.runtime.lastError.message || "Content script unreachable"
+        });
+        return;
+      }
+
+      // Handle navigation/pending — schedule retry
+      if (response?.pending === true) {
+        console.log(`[Queue] Action ${action.id} pending navigation, scheduling retry...`);
+        pendingNavigationActions.set(action.id, action);
+        if (response.url) {
+          chrome.tabs.update(targetTab.id!, { url: response.url });
+        }
+        chrome.alarms.create(`retry-scrape-${action.id}`, { delayInMinutes: 0.5 });
+        return;
+      }
+
+      // scrapeLeads success — save leads via Edge Function
+      if (response?.success && response?.leads) {
+        console.log(`[Queue] Saving ${response.leads.length} scraped leads...`);
+        await saveLeadsViaEdgeFunction(
+          response.leads,
+          action.workspace_id,
+          action.campaign_id,
+          action.id,
+          "completed"
+        );
+      } else {
+        updateActionStatus(
+          action.id,
+          action.workspace_id,
+          response?.success ? "completed" : "failed",
+          response || { success: false, error: "No response from content script" }
+        );
+      }
+    })
   })
 }
 

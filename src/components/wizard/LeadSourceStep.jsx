@@ -19,17 +19,16 @@ const LEAD_SOURCES = [
   {
     id: 'extractor',
     icon: Search,
-    title: 'Lead Extractor',
+    title: 'Prospect Extractor',
     description: 'Use our LinkedIn scraper to find and collect new leads based on your search criteria and filters.'
   }
 ]
 
 export function LeadSourceStep() {
-  const { campaignData, updateCampaignData, nextStep } = useWizard()
+  const { campaignData, updateCampaignData } = useWizard()
 
   const handleSelect = (sourceId) => {
     updateCampaignData({ leadSource: sourceId })
-    nextStep()
   }
 
   return (

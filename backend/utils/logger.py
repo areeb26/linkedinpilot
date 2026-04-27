@@ -10,8 +10,13 @@ def setup_logger(name="LinkedPilot"):
             '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
         )
 
-        # Console handler
+        # Console handler - use utf-8 encoding on Windows to avoid UnicodeEncodeError
         ch = logging.StreamHandler(sys.stdout)
+        if hasattr(sys.stdout, 'reconfigure'):
+            try:
+                sys.stdout.reconfigure(encoding='utf-8')
+            except Exception:
+                pass
         ch.setFormatter(formatter)
         logger.addHandler(ch)
 

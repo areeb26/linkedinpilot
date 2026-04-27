@@ -7,6 +7,7 @@ const ThemeProviderContext = createContext({
 
 export function ThemeProvider({
   children,
+  // Design system: surface.base = #000000 → dark is the canonical theme
   defaultTheme = "dark",
   storageKey = "linkedpilot-theme",
   ...props
@@ -20,6 +21,9 @@ export function ThemeProvider({
 
   useEffect(() => {
     const root = window.document.documentElement
+    // Remove both classes then apply the active one.
+    // "dark" → no extra class needed (CSS vars default to dark palette)
+    // "light" → adds .light class which overrides surface tokens
     root.classList.remove("light", "dark")
     root.classList.add(theme)
     localStorage.setItem(storageKey, theme)

@@ -41,8 +41,6 @@ export function IcpConfigModal({ isOpen, onClose }) {
     })
   }
 
-  const isConfigEmpty = !config?.titles?.length && !config?.industries?.length
-
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[425px]">
@@ -80,7 +78,7 @@ export function IcpConfigModal({ isOpen, onClose }) {
               value={formData.keywords}
               onChange={(e) => setFormData(prev => ({ ...prev, keywords: e.target.value }))}
             />
-            <p className="text-[10px] text-[#94a3b8]">Comma separated values</p>
+            <p className="text-[10px] text-[var(--color-text-secondary)]">Comma separated values</p>
           </div>
         </div>
 

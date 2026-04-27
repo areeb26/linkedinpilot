@@ -52,8 +52,8 @@ create table if not exists linkedin_accounts (
   avatar_url          text,
   email               text,
   status              text not null default 'pending', -- pending | active | warming | paused | disconnected | error
-  daily_connection_limit  int not null default 20,
-  daily_message_limit     int not null default 50,
+  daily_connection_limit  int not null default 5,
+  daily_message_limit     int not null default 5,
   today_connections       int not null default 0,
   today_messages          int not null default 0,
   connections_reset_at    timestamptz not null default now(),
@@ -100,6 +100,7 @@ create table if not exists leads (
   source              text,                   -- manual | csv | lead-extractor | api
   is_archived         boolean not null default false,
   notes               text,
+  action_queue_id     uuid references action_queue(id) on delete set null,
   created_at          timestamptz not null default now(),
   updated_at          timestamptz not null default now()
 );
@@ -171,6 +172,7 @@ create table if not exists action_queue (
   error_message         text,
   retry_count           int not null default 0,
   max_retries           int not null default 3,
+  result                jsonb,
   created_at            timestamptz not null default now(),
   updated_at            timestamptz not null default now()
 );
@@ -541,3 +543,28 @@ create trigger trg_automations_updated_at
 create trigger trg_shared_reports_updated_at
   before update on shared_reports
   for each row execute function set_updated_at();
+
+-- ============================================================
+-- RPC HELPERS
+-- Called by the Python worker to increment daily counters.
+-- ============================================================
+
+create or replace function increment_today_connections(account_id uuid)
+returns void
+language sql
+security definer as $$
+  update linkedin_accounts
+  set today_connections = today_connections + 1,
+      updated_at        = now()
+  where id = account_id;
+$$;
+
+create or replace function increment_today_messages(account_id uuid)
+returns void
+language sql
+security definer as $$
+  update linkedin_accounts
+  set today_messages = today_messages + 1,
+      updated_at     = now()
+  where id = account_id;
+$$;

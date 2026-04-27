@@ -2,7 +2,7 @@ import React, { memo } from 'react'
 import { Handle, Position } from 'reactflow'
 import { Zap } from 'lucide-react'
 
-export default memo(({ data, selected }) => {
+const TriggerNode = memo(({ data, selected }) => {
   return (
     <div className={`px-4 py-3 rounded-xl border bg-[#1e1e1e] shadow-2xl min-w-[180px] transition-all ${
       selected ? 'border-green-500 ring-2 ring-green-500/20' : 'border-white/10'
@@ -24,3 +24,5 @@ export default memo(({ data, selected }) => {
     </div>
   )
 })
+TriggerNode.displayName = 'TriggerNode'
+export default TriggerNode

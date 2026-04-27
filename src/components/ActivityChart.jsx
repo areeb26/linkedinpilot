@@ -1,4 +1,4 @@
-import React from "react";
+import React from 'react'
 import {
   ResponsiveContainer,
   AreaChart,
@@ -7,114 +7,156 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-} from "recharts";
+} from 'recharts'
+import { useChartData } from '@/hooks/useChartData'
+import { useUiStore } from '@/store/uiStore'
 
-const data = [
-  { name: "Mon", connections: 45, accepted: 32, messages: 85, replies: 24, opportunities: 12 },
-  { name: "Tue", connections: 52, accepted: 38, messages: 92, replies: 28, opportunities: 15 },
-  { name: "Wed", connections: 48, accepted: 35, messages: 88, replies: 26, opportunities: 14 },
-  { name: "Thu", connections: 65, accepted: 42, messages: 110, replies: 35, opportunities: 18 },
-  { name: "Fri", connections: 58, accepted: 40, messages: 105, replies: 32, opportunities: 16 },
-  { name: "Sat", connections: 35, accepted: 25, messages: 70, replies: 18, opportunities: 8 },
-  { name: "Sun", connections: 40, accepted: 28, messages: 75, replies: 20, opportunities: 10 },
-];
+// Skeleton bar for loading state
+function SkeletonBar({ height = '100%' }) {
+  return (
+    <div
+      className="w-full rounded-lg bg-muted/40 animate-pulse"
+      style={{ height }}
+    />
+  )
+}
 
 const ActivityChart = () => {
+  const { data: chartData = [], isLoading, error } = useChartData()
+  const timeFilter = useUiStore((s) => s.timeFilter)
+
+  // Determine x-axis label format based on time window
+  const formatXAxis = (value) => {
+    if (timeFilter <= 7) return value  // "Apr 25" already short
+    // For longer windows, show only every Nth label to avoid crowding
+    return value
+  }
+
+  const periodLabel =
+    timeFilter === 1 ? 'today' :
+    timeFilter === 7 ? 'the last 7 days' :
+    timeFilter === 30 ? 'the last 30 days' :
+    'the last 3 months'
+
   return (
-    <div className="bg-card p-6 rounded-xl border border-border/60 shadow-sm animate-slide-up stagger-2">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+    <div className="bg-[var(--color-surface-strong)] p-[var(--space-4)] rounded-xs border border-[var(--color-border)] shadow-elevation-1 animate-slide-up stagger-2">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-[var(--space-4)]">
         <div>
-          <h3 className="text-foreground text-lg font-semibold tracking-tight">Activity Overview</h3>
-          <p className="text-sm text-muted-foreground mt-0.5">Your outreach performance over the last 7 days</p>
+          <h3 className="text-[var(--color-text-on-strong)] text-lg font-semibold tracking-tight">Activity Overview</h3>
+          <p className="text-sm text-[var(--color-text-secondary)] mt-0.5">
+            Your outreach performance over {periodLabel}
+          </p>
         </div>
         <div className="flex items-center gap-4 flex-wrap">
           {[
-            { label: 'Connections', color: 'bg-primary' },
-            { label: 'Accepted', color: 'bg-warning' },
-            { label: 'Messages', color: 'bg-accent' },
+            { label: 'Connections',   color: 'bg-[var(--color-surface-raised)]' },
+            { label: 'Messages',      color: 'bg-[oklch(var(--warning))]' },
+            { label: 'Profile Views', color: 'bg-[oklch(var(--info))]' },
           ].map((item) => (
             <div key={item.label} className="flex items-center gap-2">
               <div className={`w-2.5 h-2.5 rounded-full ${item.color}`} />
-              <span className="text-xs font-medium text-muted-foreground">{item.label}</span>
+              <span className="text-xs font-medium text-[var(--color-text-secondary)]">{item.label}</span>
             </div>
           ))}
         </div>
       </div>
+
       <div style={{ width: '100%', height: 280 }}>
-        <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="oklch(var(--border))" />
-            <XAxis
-              dataKey="name"
-              axisLine={false}
-              tickLine={false}
-              tick={{ fill: 'oklch(var(--muted-foreground))', fontSize: 12 }}
-              dy={10}
-            />
-            <YAxis
-              axisLine={false}
-              tickLine={false}
-              tick={{ fill: 'oklch(var(--muted-foreground))', fontSize: 12 }}
-            />
-            <Tooltip
-              contentStyle={{
-                backgroundColor: 'oklch(var(--card))',
-                border: '1px solid oklch(var(--border))',
-                borderRadius: '8px',
-                color: 'oklch(var(--foreground))'
-              }}
-              itemStyle={{ fontSize: '12px' }}
-            />
-            <Area
-              type="monotone"
-              dataKey="connections"
-              stroke="oklch(var(--primary))"
-              fill="oklch(var(--primary))"
-              fillOpacity={0.15}
-              strokeWidth={2}
-              dot={false}
-            />
-            <Area
-              type="monotone"
-              dataKey="accepted"
-              stroke="oklch(var(--warning))"
-              fill="oklch(var(--warning))"
-              fillOpacity={0.15}
-              strokeWidth={2}
-              dot={false}
-            />
-            <Area
-              type="monotone"
-              dataKey="messages"
-              stroke="oklch(var(--accent))"
-              fill="oklch(var(--accent))"
-              fillOpacity={0.15}
-              strokeWidth={2}
-              dot={false}
-            />
-            <Area
-              type="monotone"
-              dataKey="replies"
-              stroke="oklch(var(--primary) / 0.8)"
-              fill="oklch(var(--primary) / 0.8)"
-              fillOpacity={0.15}
-              strokeWidth={2}
-              dot={false}
-            />
-            <Area
-              type="monotone"
-              dataKey="opportunities"
-              stroke="oklch(var(--accent))"
-              fill="oklch(var(--accent))"
-              fillOpacity={0.15}
-              strokeWidth={2}
-              dot={false}
-            />
-          </AreaChart>
-        </ResponsiveContainer>
+        {isLoading ? (
+          <div className="flex items-end gap-1 h-full px-2 pb-6">
+            {Array.from({ length: Math.min(timeFilter, 14) }).map((_, i) => (
+              <SkeletonBar key={i} height={`${30 + Math.random() * 60}%`} />
+            ))}
+          </div>
+        ) : error ? (
+          <div className="h-full flex items-center justify-center text-sm text-[var(--color-text-secondary)]">
+            Failed to load chart data
+          </div>
+        ) : chartData.length === 0 ? (
+          <div className="h-full flex flex-col items-center justify-center gap-2 text-sm text-[var(--color-text-secondary)]">
+            <p>No activity data yet.</p>
+            <p className="text-xs">Start a campaign to see your outreach performance here.</p>
+          </div>
+        ) : (
+          <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
+            <AreaChart
+              data={chartData}
+              margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+            >
+              <CartesianGrid
+                strokeDasharray="3 3"
+                vertical={false}
+                stroke="var(--color-border)"
+              />
+              <XAxis
+                dataKey="date"
+                axisLine={false}
+                tickLine={false}
+                tick={{ fill: 'var(--color-text-secondary)', fontSize: 11 }}
+                dy={10}
+                interval={timeFilter <= 7 ? 0 : timeFilter <= 30 ? 4 : 9}
+                tickFormatter={formatXAxis}
+              />
+              <YAxis
+                axisLine={false}
+                tickLine={false}
+                tick={{ fill: 'var(--color-text-secondary)', fontSize: 11 }}
+                allowDecimals={false}
+              />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: 'var(--color-surface-strong)',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: '16px',
+                  color: 'var(--color-text-on-strong)',
+                  fontSize: '12px',
+                }}
+                labelStyle={{ fontWeight: 600, marginBottom: 4 }}
+                formatter={(value, name) => {
+                  const labels = {
+                    connectionsSent: 'Connections',
+                    messagesSent: 'Messages',
+                    profileViews: 'Profile Views',
+                  }
+                  return [value, labels[name] ?? name]
+                }}
+              />
+              <Area
+                type="monotone"
+                dataKey="connectionsSent"
+                stroke="var(--color-surface-raised)"
+                fill="var(--color-surface-raised)"
+                fillOpacity={0.15}
+                strokeWidth={2}
+                dot={false}
+                activeDot={{ r: 4 }}
+              />
+              <Area
+                type="monotone"
+                dataKey="messagesSent"
+                stroke="oklch(var(--warning))"
+                fill="oklch(var(--warning))"
+                fillOpacity={0.15}
+                strokeWidth={2}
+                dot={false}
+                activeDot={{ r: 4 }}
+              />
+              <Area
+                type="monotone"
+                dataKey="profileViews"
+                stroke="oklch(var(--info))"
+                fill="oklch(var(--info))"
+                fillOpacity={0.15}
+                strokeWidth={2}
+                dot={false}
+                activeDot={{ r: 4 }}
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        )}
       </div>
     </div>
-  );
-};
+  )
+}
 
-export default ActivityChart;
+export default ActivityChart

@@ -1,5 +1,15 @@
-import React, { useState } from "react"
-import { useLinkedInAccounts, useToggleAccount, useDeleteAccount } from "@/hooks/useLinkedInAccounts"
+import React, { useState, useEffect } from "react"
+import { useWorkspaceStore } from "@/store/workspaceStore"
+import { useQueryClient } from "@tanstack/react-query"
+import { Skeleton } from "@/components/ui/skeleton"
+import {
+  useUnipileAccounts,
+  useReconnectAccount,
+  useDeleteUnipileAccount,
+  useSyncProfile,
+} from "@/hooks/useUnipileAccounts"
+import { useDeleteAccount } from "@/hooks/useLinkedInAccounts"
+import { useToggleAccount } from "@/hooks/useLinkedInAccounts"
 import { ConnectAccountModal } from "@/components/accounts/ConnectAccountModal"
 import { Dialog } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
@@ -20,12 +30,30 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Plus, MoreVertical, RefreshCw, Settings, Trash2, Globe } from "lucide-react"
+import { Plus, MoreVertical, RefreshCw, Trash2, Globe, RotateCcw, UserCheck } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
+import { toast } from "react-hot-toast"
 
 export default function LinkedInAccounts() {
-  const { data: accounts = [], isLoading } = useLinkedInAccounts()
+  const { workspaceId } = useWorkspaceStore()
+  const { data: accounts = [], isLoading } = useUnipileAccounts(workspaceId)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const queryClient = useQueryClient()
+
+  // Handle redirect back from Unipile hosted auth
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('unipile_connected') === '1') {
+      toast.success('LinkedIn account connected successfully!')
+      queryClient.invalidateQueries({ queryKey: ['unipile-accounts', workspaceId] })
+      // Clean up URL
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+    if (params.get('unipile_error') === '1') {
+      toast.error('LinkedIn connection failed. Please try again.')
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+  }, [workspaceId, queryClient])
 
   const filtered = accounts
 
@@ -50,8 +78,23 @@ export default function LinkedInAccounts() {
       {/* Accounts Table */}
       <div className="rounded-xl bg-card border border-border overflow-hidden">
         {isLoading ? (
-          <div className="p-8 text-center">
-            <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
+          <div className="p-6 space-y-4">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="flex items-center gap-4 p-4 border-b border-border last:border-0">
+                <Skeleton className="h-12 w-12 rounded-full" />
+                <div className="flex-1 space-y-2">
+                  <Skeleton className="h-4 w-48" />
+                  <Skeleton className="h-3 w-32" />
+                </div>
+                <Skeleton className="h-6 w-16 rounded-full" />
+                <Skeleton className="h-6 w-20 rounded-full" />
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-8 w-8 rounded" />
+              </div>
+            ))}
           </div>
         ) : filtered.length > 0 ? (
           <Table>
@@ -59,6 +102,7 @@ export default function LinkedInAccounts() {
               <TableRow className="border-border hover:bg-transparent">
                 <TableHead className="text-muted-foreground font-medium">Account</TableHead>
                 <TableHead className="text-muted-foreground font-medium">Status</TableHead>
+                <TableHead className="text-muted-foreground font-medium">Unipile Status</TableHead>
                 <TableHead className="text-muted-foreground font-medium">Type</TableHead>
                 <TableHead className="text-muted-foreground font-medium">Connection Type</TableHead>
                 <TableHead className="text-muted-foreground font-medium">Daily Requests Usage</TableHead>
@@ -69,7 +113,10 @@ export default function LinkedInAccounts() {
             </TableHeader>
             <TableBody>
               {filtered.map(account => (
-                <AccountTableRow key={account.id} account={account} />
+                <AccountTableRow 
+                  key={account.id} 
+                  account={account} 
+                />
               ))}
             </TableBody>
           </Table>
@@ -104,16 +151,68 @@ export default function LinkedInAccounts() {
 
 function AccountTableRow({ account }) {
   const toggleMutation = useToggleAccount()
-  const deleteMutation = useDeleteAccount()
+  const deleteUnipileMutation = useDeleteUnipileAccount()
+  const deleteLocalMutation = useDeleteAccount()
+  const reconnectMutation = useReconnectAccount()
+  const syncProfileMutation = useSyncProfile()
 
-  const requestsProgress = Math.round((account.today_connections / (account.daily_connection_limit || 1)) * 100)
-  const messagesProgress = Math.round((account.today_messages / (account.daily_message_limit || 1)) * 100)
+  const connLimit = account.daily_connection_limit || 5
+  const msgLimit = account.daily_message_limit || 5
+  const requestsProgress = Math.round((account.today_connections / connLimit) * 100)
+  const messagesProgress = Math.round((account.today_messages / msgLimit) * 100)
 
   const getStatusBadge = () => {
     if (account.status === 'active') {
       return <Badge className="bg-success hover:bg-green-600 text-foreground border-0 text-xs">Active</Badge>
     }
     return <Badge variant="secondary" className="text-xs">Paused</Badge>
+  }
+
+  const getUnipileStatusBadge = () => {
+    switch (account.unipile_status) {
+      case 'CONNECTED':
+        return (
+          <Badge className="bg-success hover:bg-success/90 text-foreground border-0 text-xs">
+            Connected
+          </Badge>
+        )
+      case 'RECONNECT_REQUIRED':
+        return (
+          <Badge className="bg-amber-500 hover:bg-amber-500/90 text-foreground border-0 text-xs">
+            Reconnect Required
+          </Badge>
+        )
+      case 'ERROR':
+        return (
+          <Badge className="bg-destructive hover:bg-destructive/90 text-foreground border-0 text-xs">
+            Error
+          </Badge>
+        )
+      case 'CONNECTING':
+        return (
+          <Badge className="bg-info hover:bg-info/90 text-foreground border-0 text-xs">
+            Connecting
+          </Badge>
+        )
+      case 'UNKNOWN':
+      default:
+        return (
+          <Badge variant="secondary" className="text-xs">
+            Unknown
+          </Badge>
+        )
+    }
+  }
+
+  const getTypeBadge = () => {
+    const features = account.premium_features ?? []
+    if (features.includes('sales_navigator'))
+      return <Badge className="bg-amber-500/20 text-amber-400 border border-amber-500/30 text-xs">Sales Nav</Badge>
+    if (features.includes('recruiter'))
+      return <Badge className="bg-purple-500/20 text-purple-400 border border-purple-500/30 text-xs">Recruiter</Badge>
+    if (features.includes('premium'))
+      return <Badge className="bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 text-xs">Premium</Badge>
+    return <Badge variant="outline" className="text-xs text-muted-foreground border-border">Free</Badge>
   }
 
   const getConnectionTypeBadge = () => {
@@ -130,6 +229,25 @@ function AccountTableRow({ account }) {
   const lastSyncText = account.last_synced_at 
     ? formatDistanceToNow(new Date(account.last_synced_at), { addSuffix: true })
     : 'Never'
+
+  const handleDelete = () => {
+    if (!confirm('Are you sure you want to remove this account?')) return
+
+    if (account.unipile_account_id) {
+      // Delete via Unipile first, then Supabase row on success
+      deleteUnipileMutation.mutate({
+        unipile_account_id: account.unipile_account_id,
+        supabase_row_id: account.id,
+      })
+    } else {
+      // Fallback: Supabase-only delete for legacy accounts without a Unipile ID
+      deleteLocalMutation.mutate(account.id)
+    }
+  }
+
+  const handleReconnect = () => {
+    reconnectMutation.mutate({ unipile_account_id: account.unipile_account_id })
+  }
 
   return (
     <TableRow className="border-border">
@@ -154,15 +272,14 @@ function AccountTableRow({ account }) {
         </div>
       </TableCell>
 
-      {/* Status */}
+      {/* Local Status */}
       <TableCell>{getStatusBadge()}</TableCell>
 
+      {/* Unipile Status */}
+      <TableCell>{getUnipileStatusBadge()}</TableCell>
+
       {/* Type */}
-      <TableCell>
-        <Badge variant="outline" className="text-xs text-muted-foreground border-border">
-          Free
-        </Badge>
-      </TableCell>
+      <TableCell>{getTypeBadge()}</TableCell>
 
       {/* Connection Type */}
       <TableCell>{getConnectionTypeBadge()}</TableCell>
@@ -171,7 +288,7 @@ function AccountTableRow({ account }) {
       <TableCell>
         <div className="flex items-center gap-3">
           <span className="text-sm text-foreground whitespace-nowrap">
-            {account.today_connections || 0}/{account.daily_connection_limit || 5}
+            {account.today_connections || 0}/{connLimit}
           </span>
           <div className="w-16 h-2 bg-white/10 rounded-full overflow-hidden">
             <div 
@@ -187,7 +304,7 @@ function AccountTableRow({ account }) {
       <TableCell>
         <div className="flex items-center gap-3">
           <span className="text-sm text-foreground whitespace-nowrap">
-            {account.today_messages || 0}/{account.daily_message_limit || 5}
+            {account.today_messages || 0}/{msgLimit}
           </span>
           <div className="w-16 h-2 bg-white/10 rounded-full overflow-hidden">
             <div 
@@ -212,7 +329,7 @@ function AccountTableRow({ account }) {
               <MoreVertical className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-40 bg-secondary border-border">
+          <DropdownMenuContent align="end" className="w-44 bg-secondary border-border">
             <DropdownMenuItem 
               onClick={() => toggleMutation.mutate({ id: account.id, status: account.status })}
               className="text-sm text-foreground focus:bg-secondary cursor-pointer"
@@ -220,17 +337,34 @@ function AccountTableRow({ account }) {
               <RefreshCw className="mr-2 h-4 w-4" />
               {account.status === 'active' ? 'Pause' : 'Activate'}
             </DropdownMenuItem>
-            <DropdownMenuItem className="text-sm text-foreground focus:bg-secondary cursor-pointer">
-              <Settings className="mr-2 h-4 w-4" />
-              Settings
-            </DropdownMenuItem>
+            {account.unipile_account_id && (
+              <>
+                <DropdownMenuSeparator className="bg-white/10" />
+                <DropdownMenuItem
+                  onClick={handleReconnect}
+                  disabled={reconnectMutation.isPending}
+                  className="text-sm text-foreground focus:bg-secondary cursor-pointer"
+                >
+                  <RotateCcw className="mr-2 h-4 w-4" />
+                  Reconnect
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => syncProfileMutation.mutate({
+                    unipile_account_id: account.unipile_account_id,
+                    supabase_row_id: account.id,
+                  })}
+                  disabled={syncProfileMutation.isPending}
+                  className="text-sm text-foreground focus:bg-secondary cursor-pointer"
+                >
+                  <UserCheck className="mr-2 h-4 w-4" />
+                  {syncProfileMutation.isPending ? 'Syncing…' : 'Sync Profile'}
+                </DropdownMenuItem>
+              </>
+            )}
             <DropdownMenuSeparator className="bg-white/10" />
             <DropdownMenuItem 
-              onClick={() => {
-                if (confirm('Are you sure you want to remove this account?')) {
-                  deleteMutation.mutate(account.id)
-                }
-              }}
+              onClick={handleDelete}
+              disabled={deleteUnipileMutation.isPending || deleteLocalMutation.isPending}
               className="text-sm text-destructive focus:bg-secondary cursor-pointer"
             >
               <Trash2 className="mr-2 h-4 w-4" />

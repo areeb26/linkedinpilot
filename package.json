@@ -4,9 +4,10 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently --names \"vite,backend\" --prefix-colors \"cyan,green\" \"npm run dev:ui\" \"npm run dev:backend\"",
+    "dev": "concurrently --names \"vite,backend,worker\" --prefix-colors \"cyan,green,yellow\" \"npm run dev:ui\" \"npm run dev:backend\" \"npm run dev:worker\"",
     "dev:ui": "vite",
-    "dev:backend": "python backend/main.py",
+    "dev:backend": "py backend/main.py",
+    "dev:worker": "py backend/worker.py",
     "build": "vite build",
     "lint": "eslint . --max-warnings 0",
     "preview": "vite preview"
@@ -30,6 +31,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "concurrently": "^9.2.1",
+    "crypto-browserify": "^3.12.1",
     "eslint": "^9.12.0",
     "eslint-plugin-react": "^7.37.0",
     "eslint-plugin-react-hooks": "^5.0.0",
@@ -57,6 +59,7 @@
     "react-router-dom": "^6.30.3",
     "reactflow": "^11.11.4",
     "recharts": "^3.8.1",
+    "unipile-node-sdk": "^1.9.3",
     "zod": "^4.3.6",
     "zustand": "^5.0.12"
   }

@@ -367,21 +367,28 @@ async function handleAction(action: string, payload: any) {
   console.log(`[handleAction] Processing: ${action}`, payload);
   try {
     switch (action) {
+      // ── Allowed: lead scraping ──────────────────────────────────────────
       case "scrapeLeads":
         return await scrapeLeads(payload)
-      case "viewProfile":
-        return await viewProfile(payload.url)
-      case "connect":
-      case "sendConnectionRequest":
-        return await sendConnectionRequest(payload.profile_url || payload.url, payload.message || payload.note)
-      case "sendMessage":
-        return await sendMessageViaAPI(payload.threadId || payload.url, payload.message)
+
+      // ── Allowed: account setup (used during login flow only) ────────────
+      case "getProfileInfo":
+        return await getProfileInfo()
       case "FETCH_CONVERSATIONS":
         return await fetchConversationsViaAPI()
       case "SYNC_INBOX":
         return await fetchConversationsViaAPI()
-      case "getProfileInfo":
-        return await getProfileInfo()
+
+      // ── Blocked: all outreach actions must go through Python worker ─────
+      case "connect":
+      case "sendConnectionRequest":
+      case "sendMessage":
+      case "viewProfile":
+      case "withdraw":
+      case "inmail":
+        console.warn(`[handleAction] Action "${action}" is not handled by the extension. Route through Python worker.`)
+        return { success: false, error: `Action "${action}" must be executed by the backend worker, not the extension.` }
+
       default:
         throw new Error(`Unknown action: ${action}`)
     }
@@ -606,6 +613,80 @@ async function autoScroll(containerSelector?: string, maxScrolls = 10) {
 }
 
 /**
+ * Validate that the current URL matches the expected pattern for the extraction type.
+ */
+function validateUrlForExtractionType(url: string, extractionType: string): { valid: boolean; error?: string; expectedUrl?: string } {
+  const urlLower = url.toLowerCase()
+  
+  switch (extractionType) {
+    case 'search':
+      // Regular LinkedIn search
+      if (urlLower.includes('/search/results/people/') || 
+          urlLower.includes('/search/results/all/')) {
+        return { valid: true }
+      }
+      return { 
+        valid: false, 
+        error: 'Please navigate to a LinkedIn search results page (search/results/people/)',
+        expectedUrl: 'https://www.linkedin.com/search/results/people/'
+      }
+    
+    case 'nav-search':
+      // Sales Navigator search results
+      if (urlLower.includes('/sales/search/people') || 
+          urlLower.includes('linkedin.com/sales/') && urlLower.includes('/search')) {
+        return { valid: true }
+      }
+      return { 
+        valid: false, 
+        error: 'Please navigate to a Sales Navigator search page',
+        expectedUrl: 'https://www.linkedin.com/sales/search/people'
+      }
+    
+    case 'nav-saved':
+      // Sales Navigator saved search
+      if (urlLower.includes('/sales/search/people') || 
+          urlLower.includes('/sales/saved-search/')) {
+        return { valid: true }
+      }
+      return { 
+        valid: false, 
+        error: 'Please navigate to a Sales Navigator saved search',
+        expectedUrl: 'https://www.linkedin.com/sales/search/people'
+      }
+    
+    case 'nav-list':
+      // Sales Navigator list
+      if (urlLower.includes('/sales/lists/people/') || 
+          urlLower.includes('/sales/lists/') ||
+          urlLower.includes('/sales/lead-lists/')) {
+        return { valid: true }
+      }
+      return { 
+        valid: false, 
+        error: 'Please navigate to a Sales Navigator list page',
+        expectedUrl: 'https://www.linkedin.com/sales/lists/people/'
+      }
+    
+    case 'engagement':
+      // Post engagement (comments/reactions)
+      if (urlLower.includes('/feed/update/') || 
+          urlLower.includes('/posts/')) {
+        return { valid: true }
+      }
+      return { 
+        valid: false, 
+        error: 'Please navigate to a LinkedIn post to extract engagement',
+        expectedUrl: 'https://www.linkedin.com/feed/'
+      }
+    
+    default:
+      // Unknown type - allow it
+      return { valid: true }
+  }
+}
+
+/**
  * Parse a LinkedIn headline into structured title/company fields.
  */
 function enrichLead(lead: any) {
@@ -683,6 +764,7 @@ async function scrapeSearchResults(payload?: any) {
   }
 
   const targetUrl = payload?.url
+  const extractionType = payload?.extractionType || 'search'
 
   // If we need to navigate to the target URL, do so and return 'navigating'
   if (targetUrl && !window.location.href.includes(targetUrl.split('?')[0])) {
@@ -694,9 +776,20 @@ async function scrapeSearchResults(payload?: any) {
   // Wait a moment for SPA to settle if just navigated
   await randomDelay(500, 1000)
 
-  // Simplified validation: just check if we're on LinkedIn and have profile links
+  // Validate URL matches extraction type
   const currentUrl = window.location.href
   const isLinkedIn = currentUrl.includes('linkedin.com')
+
+  // URL pattern validation based on extraction type
+  const urlValidation = validateUrlForExtractionType(currentUrl, extractionType)
+  if (!urlValidation.valid) {
+    console.warn(`[Scraper] URL validation failed for ${extractionType}:`, urlValidation.error)
+    return { 
+      success: false, 
+      error: urlValidation.error,
+      expectedUrl: urlValidation.expectedUrl 
+    }
+  }
 
   // More comprehensive selectors for search results
   const hasSearchResults = !!document.querySelector(
@@ -937,7 +1030,7 @@ async function scrapeSearchResults(payload?: any) {
                 location: locationText,
                 services: servicesText,
                 avatar_url: avatarUrl,
-                source: "lead-extractor"
+                source: "prospect-extractor"
             });
             console.log(`[Scraper] Extracted lead ${index}: ${nameText}`);
             index++;
@@ -1215,10 +1308,14 @@ async function sendConnectionRequest(url: string, note: string) {
     console.warn("[Voyager] API Connection request failed, falling back to DOM")
   }
 
-  if (!window.location.href.includes(url)) {
-     window.location.href = url
-     return { success: true, pending: true, message: "Redirected to profile" }
+  // DOM fallback: navigate to profile if not already there
+  const cleanUrl = url.split('?')[0]
+  if (!window.location.href.includes(cleanUrl)) {
+    window.location.href = cleanUrl
+    // Return pending with the URL so background.ts navigates the tab and retries
+    return { success: true, pending: true, url: cleanUrl }
   }
+
   await randomDelay(3000, 5000)
   
   const connectBtn = await waitForElement('button[aria-label^="Invite"][class*="primary-action"]') || 
@@ -1330,29 +1427,27 @@ async function sendConnectionRequestViaAPI(publicId: string, note: string) {
   console.log(`[Voyager] Sending connection request to ${publicId}`);
   
   try {
-    // First, we need the profile data to get the trackingId and profileId
+    // Fetch the profile to get the fsd_profile URN (needed for the invitation API)
     const profileResp = await fetch(`/voyager/api/identity/dash/profiles?q=memberIdentity&memberIdentity=${publicId}`, {
       headers: getVoyagerHeaders()
     });
     
-    if (!profileResp.ok) throw new Error("Could not fetch profile for invitation");
+    if (!profileResp.ok) throw new Error(`Could not fetch profile: ${profileResp.status}`);
     
     const profileData = await profileResp.json();
-    const profile = profileData.included?.find((i: any) => i.$type?.includes("identity.dash.Profile"));
-    const entityUrn = profile?.entityUrn || "";
-    const memberId = entityUrn.split(':').pop();
 
-    if (!memberId) throw new Error("Could not resolve member ID for invitation");
+    // LinkedIn's dash/profiles returns fsd_profile URNs — we need the full URN, not just the ID
+    const profile = profileData.included?.find((i: any) =>
+      i.$type?.includes("identity.dash.Profile") || i.$type?.includes("com.linkedin.voyager.dash.identity.profile.Profile")
+    );
+    const entityUrn = profile?.entityUrn || ""; // e.g. "urn:li:fsd_profile:ACoAAA..."
+    
+    if (!entityUrn) throw new Error("Could not resolve profile URN for invitation");
 
     const payload: any = {
-      trackingId: "", // Usually optional or generated
       invitations: [{
-        trackingId: "",
-        invitee: {
-          "com.linkedin.voyager.growth.invitation.InviteeProfile": {
-            profileId: `urn:li:fs_miniProfile:${memberId}`
-          }
-        }
+        toMember: entityUrn,  // Use the full fsd_profile URN directly
+        trackingId: btoa(String.fromCharCode(...Array.from(crypto.getRandomValues(new Uint8Array(16))))),
       }]
     };
 

@@ -104,13 +104,16 @@ export function useCreateLead() {
 
 export function useUpdateLead() {
   const queryClient = useQueryClient()
+  const { workspaceId } = useWorkspaceStore()
 
   return useMutation({
     mutationFn: async ({ id, ...updates }) => {
+      if (!workspaceId) throw new Error('No workspace selected')
       const { data, error } = await supabase
         .from('leads')
         .update(updates)
         .eq('id', id)
+        .eq('workspace_id', workspaceId)
         .select()
       if (error) throw error
       return data[0]
@@ -196,7 +199,7 @@ export function useImportLeads() {
 
       const { data, error } = await supabase
         .from('leads')
-        .insert(leadsWithWorkspace)
+        .upsert(leadsWithWorkspace, { onConflict: 'workspace_id,profile_url', ignoreDuplicates: false })
         .select()
       if (error) throw error
       return data
@@ -250,6 +253,33 @@ export function useWorkspaceConfig() {
   })
 
   return { ...query, updateConfig: updateMutation.mutate, isUpdating: updateMutation.isPending }
+}
+
+export function useAddLeadsToCampaign() {
+  const { workspaceId } = useWorkspaceStore()
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({ campaignId, leadIds, linkedinAccountId }) => {
+      const rows = leadIds.map(leadId => ({
+        workspace_id: workspaceId,
+        campaign_id: campaignId,
+        lead_id: leadId,
+        status: 'active',
+        ...(linkedinAccountId ? { linkedin_account_id: linkedinAccountId } : {}),
+      }))
+      const { error } = await supabase
+        .from('campaign_enrollments')
+        .upsert(rows, { onConflict: 'campaign_id,lead_id', ignoreDuplicates: true })
+      if (error) throw error
+      return leadIds.length
+    },
+    onSuccess: (count) => {
+      toast.success(`${count} lead${count !== 1 ? 's' : ''} added to campaign`)
+      queryClient.invalidateQueries({ queryKey: ['campaigns'] })
+    },
+    onError: (err) => toast.error(`Failed: ${err.message}`),
+  })
 }
 
 export function useScoreLeads() {

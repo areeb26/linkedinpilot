@@ -1,6 +1,6 @@
 fastapi
 uvicorn[standard]
-playwright
+# playwright  # archived — Unipile handles all LinkedIn actions; scraper/engine.py retained but dormant
 supabase
 cryptography
 google-generativeai
@@ -9,3 +9,4 @@ duckduckgo-search
 python-dotenv
 psycopg2-binary
 requests
+httpx>=0.27.0

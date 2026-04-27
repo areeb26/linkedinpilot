@@ -26,10 +26,14 @@ async function fetchStats(workspaceId, days) {
       .eq('workspace_id', workspaceId)
       .gte('created_at', since),
 
+    // Fetch ALL connected leads (no date filter) — connection_status is a
+    // cumulative state, not a timestamped event, so date-filtering by updated_at
+    // is unreliable (updated_at changes for many reasons).
     supabase
       .from('leads')
       .select('connection_status')
-      .eq('workspace_id', workspaceId),
+      .eq('workspace_id', workspaceId)
+      .eq('connection_status', 'connected'),
   ])
 
   if (actionsRes.error) throw actionsRes.error
@@ -38,18 +42,17 @@ async function fetchStats(workspaceId, days) {
 
   const actions = actionsRes.data ?? []
   const msgs = messagesRes.data ?? []
-  const leads = leadsRes.data ?? []
 
-  const connectionsSent = actions.filter((a) => a.action_type === 'connect').length
-  const profileViews = actions.filter((a) => a.action_type === 'view_profile').length
-  const messagesSent = actions.filter((a) => a.action_type === 'message').length
+  // Only count actions with status 'done' to avoid counting pending/failed
+  const connectionsSent = actions.filter((a) => a.action_type === 'connect' && a.status === 'done').length
+  const profileViews = actions.filter((a) => a.action_type === 'view_profile' && a.status === 'done').length
+  const messagesSent = actions.filter((a) => a.action_type === 'message' && a.status === 'done').length
 
   const repliesReceived = msgs.filter((m) => m.direction === 'inbound').length
   const outboundMessages = msgs.filter((m) => m.direction === 'outbound').length
 
-  const connectionsAccepted = leads.filter(
-    (l) => l.connection_status === 'accepted'
-  ).length
+  // Total accepted connections (all-time cumulative count)
+  const connectionsAccepted = leadsRes.data?.length ?? 0
 
   // Opportunities = accepted connections who have replied (intersect is approximated
   // as total accepted connections — adjust when a joined query is available)

@@ -34,6 +34,7 @@ async function fetchChartData(workspaceId, days) {
     .from('actions_log')
     .select('action_type, executed_at')
     .eq('workspace_id', workspaceId)
+    .eq('status', 'done')
     .gte('executed_at', since)
     .order('executed_at', { ascending: true })
 

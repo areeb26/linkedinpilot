@@ -8,21 +8,23 @@
 function syncWorkspace() {
   try {
     const raw = localStorage.getItem("linkedpilot-workspace")
-    if (!raw) {
-      console.log("[Pilot Ext] No workspace data in localStorage yet")
-      return
-    }
+    if (!raw) return
 
     const parsed = JSON.parse(raw)
     const workspaceId = parsed?.state?.workspaceId
     const workspaceName = parsed?.state?.workspaceName
 
     if (workspaceId && workspaceId !== "ws-123") {
-      chrome.storage.local.set({
-        currentWorkspaceId: workspaceId,
-        currentWorkspaceName: workspaceName || "Workspace"
-      }, () => {
-        console.log("[Pilot Ext] Workspace synced to extension:", workspaceName, workspaceId)
+      chrome.storage.local.get(['currentWorkspaceId'], (stored) => {
+        // Only write + log when the value actually changed
+        if (stored.currentWorkspaceId !== workspaceId) {
+          chrome.storage.local.set({
+            currentWorkspaceId: workspaceId,
+            currentWorkspaceName: workspaceName || "Workspace"
+          }, () => {
+            console.log("[Pilot Ext] Workspace synced:", workspaceName, workspaceId)
+          })
+        }
       })
     }
   } catch (err) {
@@ -30,11 +32,36 @@ function syncWorkspace() {
   }
 }
 
+function syncSession() {
+  try {
+    const sessionKey = Object.keys(localStorage).find(k => k.startsWith("sb-") && k.endsWith("-auth-token"))
+    if (!sessionKey) return
+    const raw = localStorage.getItem(sessionKey)
+    if (!raw) return
+    const parsed = JSON.parse(raw)
+    const accessToken = parsed?.access_token
+    const refreshToken = parsed?.refresh_token
+    if (accessToken && refreshToken) {
+      chrome.storage.local.get(['accessToken'], (stored) => {
+        // Only write + log when the token actually changed
+        if (stored.accessToken !== accessToken) {
+          chrome.storage.local.set({ accessToken, refreshToken }, () => {
+            console.log("[Pilot Ext] Session tokens synced")
+          })
+        }
+      })
+    }
+  } catch (err) {
+    console.error("[Pilot Ext] Error syncing session:", err)
+  }
+}
+
 // Sync immediately on page load
 syncWorkspace()
+syncSession()
 
-// Also re-sync periodically (in case user switches workspace)
-setInterval(syncWorkspace, 5000)
+// Also re-sync periodically (in case user switches workspace or session refreshes)
+setInterval(() => { syncWorkspace(); syncSession() }, 5000)
 
 // Listen for storage changes (when user logs in or switches workspace)
 window.addEventListener("storage", (e) => {
@@ -60,7 +87,8 @@ window.addEventListener("message", (event) => {
       {
         type: "CONNECT_COOKIE_RELAY",
         cookie: event.data.cookie,
-        workspaceId: event.data.workspaceId
+        workspaceId: event.data.workspaceId,
+        accessToken: event.data.accessToken,
       },
       (response) => {
         window.postMessage({ type: "CONNECT_COOKIE_RESULT", ...response }, "*")
@@ -80,8 +108,9 @@ window.addEventListener("message", (event) => {
     console.log("[Pilot Ext] Relaying browser session sync...")
     chrome.runtime.sendMessage(
       {
-        type: "CONNECT_ACCOUNT", // background handler already handles cookie capture
-        workspaceId: event.data.workspaceId
+        type: "CONNECT_ACCOUNT",
+        workspaceId: event.data.workspaceId,
+        accessToken: event.data.accessToken,
       },
       (response) => {
         window.postMessage({ type: "SYNC_BROWSER_RESULT", ...response }, "*")

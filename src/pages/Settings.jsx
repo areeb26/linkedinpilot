@@ -3,20 +3,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Separator } from "@/components/ui/separator"
 import { Progress } from "@/components/ui/progress"
 import { 
-  Building2, Users, CreditCard, Puzzle, 
-  Save, Mail, Trash2, Shield, Zap, Globe, 
-  ExternalLink, Key, Loader2, AlertCircle 
+  Building2, Users, CreditCard, Puzzle,
+  Save, Mail, Trash2, Zap, Globe,
+  Loader2
 } from "lucide-react"
 import { useWorkspace, useUpdateWorkspace, useUpdateSettings } from "@/hooks/useWorkspace"
-import { useTeam, useInvitations, useInviteMember, useRemoveMember } from "@/hooks/useTeam"
+import { useTeam, useInvitations, useInviteMember } from "@/hooks/useTeam"
 import { useUsageStats } from "@/hooks/useUsageStats"
 
 export default function Settings() {
-  const [activeTab, setActiveTab] = useState("workspace")
-
   return (
     <div className="space-y-8 pb-20">
       <div className="flex flex-col gap-1">
@@ -68,7 +65,6 @@ function SettingsTabTrigger({ value, icon: Icon, label }) {
 function WorkspaceSection() {
   const { data: workspace, isLoading } = useWorkspace()
   const updateWorkspace = useUpdateWorkspace()
-  const updateSettings = useUpdateSettings()
   const [name, setName] = useState(workspace?.name || "")
 
   if (isLoading) return <div className="animate-pulse space-y-8"><div className="h-32 bg-white/5 rounded-2xl" /></div>
@@ -118,9 +114,9 @@ function WorkspaceSection() {
 
 function TeamSection() {
   const { data: members = [] } = useTeam()
-  const { data: invitations = [] } = useInvitations()
-  const inviteMember = useInviteMember()
-  const [email, setEmail] = useState("")
+  const { data: _invitations = [] } = useInvitations()
+  const _inviteMember = useInviteMember()
+  const [_email, _setEmail] = useState("")
 
   return (
     <div className="space-y-10 animate-in fade-in slide-in-from-right-4 duration-500">

@@ -1,5 +1,7 @@
-import { useState } from 'react'
+import { useState, useRef, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { toast } from 'react-hot-toast'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
   useCampaign,
   useCampaignLeads,
@@ -8,9 +10,11 @@ import {
   useLaunchCampaign,
   usePauseCampaign,
   useDuplicateCampaign,
-  useUpdateAccountLimits,
   useSendConnectionRequest
 } from '@/hooks/useCampaigns'
+import { useQueryClient } from '@tanstack/react-query'
+import { useWorkspaceStore } from '@/store/workspaceStore'
+import { supabase } from '@/lib/supabase'
 import LeadUploadModal from '@/components/campaigns/LeadUploadModal'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -19,8 +23,6 @@ import {
   ExternalLink,
   ChevronDown,
   Users,
-  GitBranch,
-  Calendar,
   Plus,
   Minus,
   Maximize2,
@@ -33,7 +35,7 @@ import ReactFlow, {
 } from 'reactflow'
 import 'reactflow/dist/style.css'
 
-// Custom Nodes
+// Custom Nodes — defined at module level so ReactFlow never sees a new object reference
 import TriggerNode from '@/components/campaigns/nodes/TriggerNode'
 import ActionNode from '@/components/campaigns/nodes/ActionNode'
 import ConditionNode from '@/components/campaigns/nodes/ConditionNode'
@@ -45,6 +47,8 @@ const nodeTypes = {
   condition: ConditionNode,
   end: EndNode,
 }
+
+const edgeTypes = {}
 
 const TABS = [
   { id: 'analytics', label: 'Analytics' },
@@ -64,16 +68,53 @@ export default function CampaignDetail() {
   const { data: accounts, isLoading: accountsLoading } = useCampaignAccounts(id)
   const { data: analytics, isLoading: analyticsLoading } = useCampaignAnalytics(id)
   
-  const launchMutation = useLaunchCampaign()
-  const pauseMutation = usePauseCampaign()
+  const _launchMutation = useLaunchCampaign()
+  const _pauseMutation = usePauseCampaign()
   const duplicateMutation = useDuplicateCampaign()
   
-  const isLoading = campaignLoading || leadsLoading || accountsLoading || analyticsLoading
-
-  if (isLoading) {
+  if (campaignLoading) {
     return (
-      <div className="h-full flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      <div className="min-h-screen bg-background">
+        {/* Breadcrumb Skeleton */}
+        <div className="px-6 py-3 border-b border-border bg-background">
+          <Skeleton className="h-4 w-64" />
+        </div>
+        
+        {/* Header Skeleton */}
+        <div className="px-6 py-4 border-b border-border">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Skeleton className="h-6 w-48" />
+              <Skeleton className="h-5 w-16 rounded-full" />
+            </div>
+            <div className="flex items-center gap-2">
+              <Skeleton className="h-9 w-40" />
+              <Skeleton className="h-9 w-32" />
+            </div>
+          </div>
+        </div>
+
+        {/* Tabs Skeleton */}
+        <div className="px-6 border-b border-border">
+          <div className="flex items-center gap-6">
+            {[...Array(5)].map((_, i) => (
+              <Skeleton key={i} className="h-10 w-24" />
+            ))}
+          </div>
+        </div>
+
+        {/* Content Skeleton */}
+        <div className="p-6">
+          <div className="grid grid-cols-5 gap-4 mb-6">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="bg-card border-border p-4 rounded-lg border">
+                <Skeleton className="h-3 w-24 mb-2" />
+                <Skeleton className="h-8 w-16 mb-2" />
+                <Skeleton className="h-1 w-full rounded-full" />
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     )
   }
@@ -134,6 +175,27 @@ export default function CampaignDetail() {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Breadcrumb Navigation */}
+      <div className="px-6 py-3 border-b border-border bg-background">
+        <div className="flex items-center gap-2 text-sm">
+          <button
+            onClick={() => navigate('/dashboard')}
+            className="text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Dashboard
+          </button>
+          <span className="text-muted-foreground">/</span>
+          <button
+            onClick={() => navigate('/campaigns')}
+            className="text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Campaigns
+          </button>
+          <span className="text-muted-foreground">/</span>
+          <span className="text-foreground">{id}</span>
+        </div>
+      </div>
+
       {/* Header */}
       <div className="px-6 py-4 border-b border-border">
         <div className="flex items-center justify-between">
@@ -145,6 +207,8 @@ export default function CampaignDetail() {
             <Button 
               variant="outline" 
               size="sm"
+              onClick={() => duplicateMutation.mutate(id)}
+              disabled={duplicateMutation.isPending}
               className="border-border bg-background text-foreground hover:bg-secondary"
             >
               <Copy className="w-4 h-4 mr-2" /> Duplicate Campaign
@@ -185,10 +249,10 @@ export default function CampaignDetail() {
 
       {/* Content */}
       <div className="p-6">
-        {activeTab === 'analytics' && <AnalyticsTab stats={campaignStats} />}
-        {activeTab === 'leads' && <LeadsTab leads={campaignLeads} accounts={campaignAccounts} campaignId={id} />}
-        {activeTab === 'accounts' && <AccountsTab accounts={campaignAccounts} campaignId={id} />}
-        {activeTab === 'sequences' && <SequencesTab nodes={nodes} edges={edges} nodeTypes={nodeTypes} />}
+        {activeTab === 'analytics' && <AnalyticsTab stats={campaignStats} isLoading={analyticsLoading} />}
+        {activeTab === 'leads' && <LeadsTab leads={campaignLeads} accounts={accounts} campaignId={id} isLoading={leadsLoading} />}
+        {activeTab === 'accounts' && <AccountsTab accounts={accounts} campaignId={id} isLoading={accountsLoading} />}
+        {activeTab === 'sequences' && <SequencesTab nodes={nodes} edges={edges} />}
         {activeTab === 'schedule' && <ScheduleTab campaign={campaign} />}
       </div>
     </div>
@@ -237,37 +301,118 @@ function AnalyticsTab({ stats }) {
 }
 
 // Leads Tab
-function LeadsTab({ leads, accounts, campaignId }) {
-  const [statusFilter, setStatusFilter] = useState('all')
+function LeadsTab({ leads, accounts, campaignId, isLoading }) {
+  const [statusFilter, _setStatusFilter] = useState('all')
   const [showUpload, setShowUpload] = useState(false)
   const sendConnection = useSendConnectionRequest()
-  // Use first active account as default sender; campaigns can have multiple
-  const defaultAccount = accounts?.find(a => a.status === 'active') || accounts?.[0]
+  const queryClient = useQueryClient()
   
-  const filteredLeads = statusFilter === 'all' 
-    ? leads 
+  // Use first active account as default sender; campaigns can have multiple
+  const defaultAccount = accounts?.find(a => a.status === 'active') || 
+                         accounts?.find(a => a.status === 'warming') ||
+                         accounts?.[0]
+
+  const filteredLeads = statusFilter === 'all'
+    ? leads
     : leads.filter(lead => lead.connection_status === statusFilter || lead.status === statusFilter)
 
-  // Map connection_status to progress label
-  const getProgress = (lead) => {
-    const status = lead.connection_status || lead.status || 'pending'
-    switch (status) {
-      case 'connected': return 'CONNECTION_ACCEPTED'
-      case 'pending': return 'CONNECTION_SENT'
-      case 'none': return 'PENDING'
-      default: return status.toUpperCase().replace('_', ' ')
+  // Progress badge component
+  const ProgressBadge = ({ lead }) => {
+    const status = lead.connection_status || 'none'
+    
+    const badges = {
+      'none': { label: 'Pending', icon: '⏳', bg: 'bg-gray-100', text: 'text-gray-700', border: 'border-gray-300' },
+      'pending': { label: 'In Progress', icon: '🔵', bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-300' },
+      'connected': { label: 'Connection Accepted', icon: '✅', bg: 'bg-green-50', text: 'text-green-700', border: 'border-green-300' },
+      'replied': { label: 'Contacted', icon: '💬', bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-300' },
+      'failed': { label: 'Failed', icon: '❌', bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-300' }
     }
+    
+    const badge = badges[status] || badges['none']
+    
+    return (
+      <div className="flex flex-col gap-1">
+        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border ${badge.bg} ${badge.text} ${badge.border}`}>
+          <span>{badge.icon}</span>
+          {badge.label}
+        </span>
+      </div>
+    )
   }
 
-  // Get progress color
-  const getProgressColor = (progress) => {
-    switch (progress) {
-      case 'CONNECTION_ACCEPTED': return 'text-success'
-      case 'MESSAGE_SENT': return 'text-info'
-      case 'CONNECTION_SENT': return 'text-warning'
-      case 'PENDING': return 'text-muted-foreground'
-      default: return 'text-muted-foreground'
+  // Lead status dropdown component
+  const LeadStatusDropdown = ({ lead }) => {
+    const [isOpen, setIsOpen] = useState(false)
+    const [currentStatus, setCurrentStatus] = useState(lead.tags?.[0] || 'Lead')
+    
+    const statuses = [
+      { value: 'Lead', icon: '🔵', color: 'text-blue-600' },
+      { value: 'Interested', icon: '✅', color: 'text-green-600' },
+      { value: 'Meeting booked', icon: '📅', color: 'text-purple-600' },
+      { value: 'Meeting complete', icon: '✔️', color: 'text-teal-600' },
+      { value: 'Closed', icon: '🎯', color: 'text-emerald-600' },
+      { value: 'Wrong person', icon: '⚠️', color: 'text-orange-600' },
+      { value: 'Not Interested', icon: '❌', color: 'text-red-600' },
+      { value: 'No Response', icon: '💤', color: 'text-gray-500' }
+    ]
+    
+    const currentStatusObj = statuses.find(s => s.value === currentStatus) || statuses[0]
+    
+    const updateLeadStatus = async (newStatus) => {
+      try {
+        await supabase
+          .from('leads')
+          .update({ tags: [newStatus] })
+          .eq('id', lead.id)
+        
+        setCurrentStatus(newStatus)
+        setIsOpen(false)
+        queryClient.invalidateQueries({ queryKey: ['campaign-leads'] })
+        toast.success(`Lead status updated to ${newStatus}`)
+      } catch (error) {
+        toast.error('Failed to update lead status')
+      }
     }
+    
+    return (
+      <div className="relative">
+        <button
+          onClick={() => setIsOpen(!isOpen)}
+          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium hover:bg-secondary transition-colors"
+        >
+          <span className={currentStatusObj.color}>{currentStatusObj.icon}</span>
+          <span className="text-foreground">{currentStatus}</span>
+          <ChevronDown className="w-3 h-3 text-muted-foreground" />
+        </button>
+        
+        {isOpen && (
+          <>
+            <div 
+              className="fixed inset-0 z-10" 
+              onClick={() => setIsOpen(false)}
+            />
+            <div className="absolute right-0 mt-1 w-48 bg-card border border-border rounded-lg shadow-lg z-20 py-1">
+              {statuses.map((status) => (
+                <button
+                  key={status.value}
+                  onClick={() => updateLeadStatus(status.value)}
+                  className={`w-full text-left px-3 py-2 text-sm hover:bg-secondary transition-colors flex items-center gap-2 ${
+                    currentStatus === status.value ? 'bg-secondary' : ''
+                  }`}
+                >
+                  <span className={status.color}>{status.icon}</span>
+                  <span className="text-foreground">{status.value}</span>
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+    )
+  }
+
+  if (isLoading) {
+    return <div className="flex items-center justify-center py-20"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" /></div>
   }
 
   return (
@@ -279,7 +424,7 @@ function LeadsTab({ leads, accounts, campaignId }) {
           <p className="text-muted-foreground text-sm">Manage and track your campaign leads</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" className="border-border bg-background text-muted-foreground" onClick={() => window.location.reload()}>
+          <Button variant="outline" size="sm" className="border-border bg-background text-muted-foreground" onClick={() => queryClient.invalidateQueries({ queryKey: ['campaign-leads'] })}>
             <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
@@ -305,7 +450,7 @@ function LeadsTab({ leads, accounts, campaignId }) {
         <table className="w-full">
           <thead>
             <tr className="border-b border-border">
-              <th className="text-left py-3 px-4 text-muted-foreground text-xs font-medium">First name</th>
+              <th className="text-left py-3 px-4 text-muted-foreground text-xs font-medium">Lead</th>
               <th className="text-left py-3 px-4 text-muted-foreground text-xs font-medium">Last name</th>
               <th className="text-left py-3 px-4 text-muted-foreground text-xs font-medium">Progress</th>
               <th className="text-left py-3 px-4 text-muted-foreground text-xs font-medium">LinkedIn</th>
@@ -317,23 +462,101 @@ function LeadsTab({ leads, accounts, campaignId }) {
           <tbody>
             {filteredLeads.length === 0 ? (
               <tr>
-                <td colSpan={7} className="py-12 text-center text-muted-foreground">
-                  <Users className="w-12 h-12 mx-auto mb-4" />
-                  <p>No leads enrolled in this campaign</p>
+                <td colSpan={7} className="p-0">
+                  <div className="py-16 px-8">
+                    <div className="max-w-4xl mx-auto text-center space-y-8">
+                      <div>
+                        <h3 className="text-2xl font-semibold text-foreground mb-2">Select Leads Source</h3>
+                        <p className="text-muted-foreground">Choose where you want to get your leads from</p>
+                      </div>
+                      
+                      <div className="grid grid-cols-3 gap-6">
+                        {/* Upload CSV */}
+                        <Card className="p-6 hover:border-primary transition-colors cursor-pointer group" onClick={() => setShowUpload(true)}>
+                          <div className="space-y-4">
+                            <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+                              <svg className="w-6 h-6 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                              </svg>
+                            </div>
+                            <div className="text-left">
+                              <h4 className="font-semibold text-foreground mb-2">Upload CSV</h4>
+                              <p className="text-sm text-muted-foreground">Import leads from a CSV file with LinkedIn URLs and optional information.</p>
+                            </div>
+                            <Button variant="link" className="text-primary p-0 h-auto font-medium group-hover:underline">
+                              Select →
+                            </Button>
+                          </div>
+                        </Card>
+
+                        {/* Lead Database */}
+                        <Card className="p-6 hover:border-primary transition-colors cursor-pointer group opacity-60">
+                          <div className="space-y-4">
+                            <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+                              <svg className="w-6 h-6 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
+                              </svg>
+                            </div>
+                            <div className="text-left">
+                              <h4 className="font-semibold text-foreground mb-2">Lead Database</h4>
+                              <p className="text-sm text-muted-foreground">Select from your existing leads database. Filter by tags, sources, or other criteria.</p>
+                            </div>
+                            <Button variant="link" className="text-muted-foreground p-0 h-auto font-medium" disabled>
+                              Coming Soon
+                            </Button>
+                          </div>
+                        </Card>
+
+                        {/* Prospect Extractor */}
+                        <Card className="p-6 hover:border-primary transition-colors cursor-pointer group" onClick={() => window.location.href = '/prospect-extractor'}>
+                          <div className="space-y-4">
+                            <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+                              <svg className="w-6 h-6 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                              </svg>
+                            </div>
+                            <div className="text-left">
+                              <h4 className="font-semibold text-foreground mb-2">Prospect Extractor</h4>
+                              <p className="text-sm text-muted-foreground">Use our LinkedIn scraper to find and collect new leads based on your search criteria and filters.</p>
+                            </div>
+                            <Button variant="link" className="text-primary p-0 h-auto font-medium group-hover:underline">
+                              Select →
+                            </Button>
+                          </div>
+                        </Card>
+                      </div>
+                    </div>
+                  </div>
                 </td>
               </tr>
             ) : (
               filteredLeads.map((lead) => {
-                const progress = getProgress(lead)
-                const progressColor = getProgressColor(progress)
                 return (
                   <tr key={lead.id} className="border-b border-border last:border-0 hover:bg-secondary">
-                    <td className="py-3 px-4 text-foreground text-sm">{lead.first_name || lead.full_name?.split(' ')[0] || '-'}</td>
-                    <td className="py-3 px-4 text-foreground text-sm">{lead.last_name || lead.full_name?.split(' ').slice(1).join(' ') || '-'}</td>
                     <td className="py-3 px-4">
-                      <span className={`text-xs ${progressColor}`}>
-                        {progress}
-                      </span>
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full overflow-hidden bg-muted flex-shrink-0">
+                          {lead.avatar_url ? (
+                            <img
+                              src={lead.avatar_url}
+                              alt={lead.full_name || ''}
+                              className="w-full h-full object-cover"
+                              onError={(e) => { e.currentTarget.style.display = 'none' }}
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-xs font-medium text-muted-foreground">
+                              {(lead.first_name?.[0] || lead.full_name?.[0] || '?').toUpperCase()}
+                            </div>
+                          )}
+                        </div>
+                        <span className="text-foreground text-sm">
+                          {lead.first_name || lead.full_name?.split(' ')[0] || lead.profile_url?.split('/in/')[1]?.split('/')[0] || '-'}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="py-3 px-4 text-foreground text-sm">{lead.last_name || lead.full_name?.split(' ').slice(1).join(' ') || ''}</td>
+                    <td className="py-3 px-4">
+                      <ProgressBadge lead={lead} />
                     </td>
                     <td className="py-3 px-4">
                       <a href={lead.profile_url} target="_blank" rel="noopener noreferrer" className="text-info text-sm flex items-center gap-1 hover:underline">
@@ -351,24 +574,28 @@ function LeadsTab({ leads, accounts, campaignId }) {
                       </span>
                     </td>
                     <td className="py-3 px-4">
-                      <span className="inline-flex items-center gap-1 text-info text-sm">
-                        Lead
-                        <ChevronDown className="w-3 h-3" />
-                      </span>
+                      <LeadStatusDropdown lead={lead} />
                     </td>
                     <td className="py-3 px-4">
                       {lead.connection_status === 'none' || !lead.connection_status ? (
                         <Button
                           size="sm"
                           variant="outline"
-                          className="border-border bg-transparent text-foreground hoves-condaryite/5 text-xs h-7 px-2"
-                          disabled={!defaultAccount || sendConnection.isPending}
-                          onClick={() => sendConnection.mutate({
-                            leadId: lead.id,
-                            profileUrl: lead.profile_url,
-                            linkedinAccountId: defaultAccount?.id,
-                            note: null,
-                          })}
+                          className="border-border bg-transparent text-foreground text-xs h-7 px-2"
+                          disabled={sendConnection.isPending}
+                          onClick={() => {
+                            if (!defaultAccount) {
+                              toast.error('No active LinkedIn account connected. Go to LinkedIn Accounts and connect one first.')
+                              return
+                            }
+                            sendConnection.mutate({
+                              leadId: lead.id,
+                              profileUrl: lead.profile_url,
+                              linkedinAccountId: defaultAccount.id,
+                              note: null,
+                              campaignId: campaignId,
+                            })
+                          }}
                         >
                           Connect
                         </Button>
@@ -392,43 +619,9 @@ function LeadsTab({ leads, accounts, campaignId }) {
 }
 
 // Accounts Tab
-function AccountsTab({ accounts, campaignId }) {
+function AccountsTab({ accounts, campaignId: _campaignId }) {
   const accountList = accounts || []
   const hasAccounts = accountList.length > 0
-  const updateLimits = useUpdateAccountLimits()
-
-  // Per-account local limit state: { [accountId]: { connection, message } }
-  const [localLimits, setLocalLimits] = useState(() =>
-    Object.fromEntries(
-      accountList.map(a => [a.id, { connection: a.limits?.connection ?? 20, message: a.limits?.message ?? 50 }])
-    )
-  )
-
-  const setLimit = (accountId, key, value) => {
-    setLocalLimits(prev => ({ ...prev, [accountId]: { ...prev[accountId], [key]: value } }))
-  }
-
-  const saveLimits = (account) => {
-    const { connection, message } = localLimits[account.id] || {}
-    updateLimits.mutate({ accountId: account.id, connectionLimit: connection, messageLimit: message })
-  }
-
-  const InteractiveSlider = ({ accountId, limitKey, max = 50 }) => {
-    const value = localLimits[accountId]?.[limitKey] ?? (limitKey === 'connection' ? 20 : 50)
-    return (
-      <div className="flex items-center gap-4">
-        <input
-          type="range"
-          min={1}
-          max={max}
-          value={value}
-          onChange={e => setLimit(accountId, limitKey, Number(e.target.value))}
-          className="flex-1 accent-primary cursor-pointer"
-        />
-        <span className="text-foreground text-sm w-8 text-right">{value}</span>
-      </div>
-    )
-  }
 
   return (
     <div className="max-w-3xl space-y-6">
@@ -476,17 +669,17 @@ function AccountsTab({ accounts, campaignId }) {
         )}
       </div>
 
-      {/* Per-account limit ranges */}
+      {/* Per-account limits display */}
       {hasAccounts && (
         <div>
-          <h3 className="text-foreground font-medium mb-1">Limit ranges</h3>
+          <h3 className="text-foreground font-medium mb-1">Safety Limits</h3>
           <p className="text-muted-foreground text-sm mb-6">
-            Daily limits per account. Stay safe — LinkedIn flags sudden spikes.
+            Strict safety limits enforced to protect your accounts.
           </p>
 
-          <div className="space-y-8">
+          <div className="space-y-4">
             {accountList.map((account) => (
-              <Card key={account.id} className="bg-card border-border p-5 space-y-5">
+              <Card key={account.id} className="bg-card border-border p-5 space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <img
@@ -497,46 +690,20 @@ function AccountsTab({ accounts, campaignId }) {
                     <span className="text-foreground text-sm font-medium">{account.full_name}</span>
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    Today: {account.today_connections ?? 0} connections · {account.today_messages ?? 0} messages
+                    Today: {account.today_connections ?? 0}/5 connections · {account.today_messages ?? 0}/5 messages
                   </div>
                 </div>
 
-                {/* Connection limit */}
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-muted-foreground text-sm">Connection requests / day</span>
-                    <span className="text-primary text-sm font-medium">
-                      {localLimits[account.id]?.connection ?? account.limits?.connection}
-                    </span>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="p-3 bg-secondary/30 rounded-lg border border-border/50">
+                    <span className="text-muted-foreground text-[10px] uppercase tracking-wider block mb-1">Daily Connection Limit</span>
+                    <span className="text-foreground font-bold">5</span>
                   </div>
-                  <InteractiveSlider accountId={account.id} limitKey="connection" max={50} />
-                  <div className="flex justify-between text-muted-foreground text-xs mt-1">
-                    <span>1</span><span>50</span>
+                  <div className="p-3 bg-secondary/30 rounded-lg border border-border/50">
+                    <span className="text-muted-foreground text-[10px] uppercase tracking-wider block mb-1">Daily Message Limit</span>
+                    <span className="text-foreground font-bold">5</span>
                   </div>
                 </div>
-
-                {/* Message limit */}
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-muted-foreground text-sm">Messages / day</span>
-                    <span className="text-primary text-sm font-medium">
-                      {localLimits[account.id]?.message ?? account.limits?.message}
-                    </span>
-                  </div>
-                  <InteractiveSlider accountId={account.id} limitKey="message" max={100} />
-                  <div className="flex justify-between text-muted-foreground text-xs mt-1">
-                    <span>1</span><span>100</span>
-                  </div>
-                </div>
-
-                <Button
-                  size="sm"
-                  onClick={() => saveLimits(account)}
-                  disabled={updateLimits.isPending}
-                  className="bg-primary hover:bg-purple-700 text-foreground"
-                >
-                  {updateLimits.isPending ? 'Saving...' : 'Save limits'}
-                </Button>
               </Card>
             ))}
           </div>
@@ -547,8 +714,8 @@ function AccountsTab({ accounts, campaignId }) {
 }
 
 // Sequences Tab
-function SequencesTab({ nodes, edges, nodeTypes }) {
-  const reactFlowInstance = React.useRef(null)
+function SequencesTab({ nodes, edges }) {
+  const reactFlowInstance = useRef(null)
   
   const onInit = (instance) => {
     reactFlowInstance.current = instance
@@ -566,11 +733,23 @@ function SequencesTab({ nodes, edges, nodeTypes }) {
     reactFlowInstance.current?.fitView({ padding: 0.2 })
   }
   
-  // Ensure nodes have proper positioning
-  const positionedNodes = nodes.map((node, index) => ({
-    ...node,
-    position: node.position || { x: 100, y: index * 100 },
-  }))
+  // Ensure nodes have proper positioning — memoized so ReactFlow sees stable references
+  const positionedNodes = useMemo(() =>
+    nodes.map((node, index) => ({
+      ...node,
+      position: node.position || { x: 100, y: index * 100 },
+    })),
+    [nodes]
+  )
+
+  // Memoize edge decoration to avoid creating a new array on every render
+  const decoratedEdges = useMemo(() =>
+    edges.map(e => ({
+      ...e,
+      markerEnd: { type: MarkerType.ArrowClosed, color: 'oklch(0.65 0.15 65)' }
+    })),
+    [edges]
+  )
 
   return (
     <div className="h-[600px] flex flex-col">
@@ -608,11 +787,9 @@ function SequencesTab({ nodes, edges, nodeTypes }) {
 
         <ReactFlow
           nodes={positionedNodes}
-          edges={edges.map(e => ({
-            ...e,
-            markerEnd: { type: MarkerType.ArrowClosed, color: 'oklch(0.65 0.15 65)' }
-          }))}
+          edges={decoratedEdges}
           nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
           onInit={onInit}
           fitView
           fitViewOptions={{ padding: 0.2 }}
@@ -657,64 +834,9 @@ function ScheduleTab({ campaign }) {
     { id: 'Sunday', label: 'Sundays' },
   ]
   
-  const timezones = [
-    { value: 'UTC', label: 'UTC (Coordinated Universal Time)' },
-    { value: 'America/New_York', label: 'EST - Eastern Standard Time (New York)' },
-    { value: 'America/Chicago', label: 'CST - Central Standard Time (Chicago)' },
-    { value: 'America/Denver', label: 'MST - Mountain Standard Time (Denver)' },
-    { value: 'America/Los_Angeles', label: 'PST - Pacific Standard Time (Los Angeles)' },
-    { value: 'America/Toronto', label: 'EST - Eastern Time (Toronto)' },
-    { value: 'America/Vancouver', label: 'PST - Pacific Time (Vancouver)' },
-    { value: 'America/Mexico_City', label: 'CST - Central Time (Mexico City)' },
-    { value: 'America/Sao_Paulo', label: 'BRT - Brasilia Time (Sao Paulo)' },
-    { value: 'America/Buenos_Aires', label: 'ART - Argentina Time (Buenos Aires)' },
-    { value: 'Europe/London', label: 'GMT - Greenwich Mean Time (London)' },
-    { value: 'Europe/Paris', label: 'CET - Central European Time (Paris)' },
-    { value: 'Europe/Berlin', label: 'CET - Central European Time (Berlin)' },
-    { value: 'Europe/Madrid', label: 'CET - Central European Time (Madrid)' },
-    { value: 'Europe/Rome', label: 'CET - Central European Time (Rome)' },
-    { value: 'Europe/Amsterdam', label: 'CET - Central European Time (Amsterdam)' },
-    { value: 'Europe/Moscow', label: 'MSK - Moscow Standard Time' },
-    { value: 'Europe/Istanbul', label: 'TRT - Turkey Time (Istanbul)' },
-    { value: 'Asia/Dubai', label: 'GST - Gulf Standard Time (Dubai)' },
-    { value: 'Asia/Karachi', label: 'PKT - Pakistan Standard Time (Karachi)' },
-    { value: 'Asia/Mumbai', label: 'IST - India Standard Time (Mumbai)' },
-    { value: 'Asia/Delhi', label: 'IST - India Standard Time (Delhi)' },
-    { value: 'Asia/Kolkata', label: 'IST - India Standard Time (Kolkata)' },
-    { value: 'Asia/Dhaka', label: 'BST - Bangladesh Standard Time (Dhaka)' },
-    { value: 'Asia/Bangkok', label: 'ICT - Indochina Time (Bangkok)' },
-    { value: 'Asia/Jakarta', label: 'WIB - Western Indonesia Time (Jakarta)' },
-    { value: 'Asia/Singapore', label: 'SGT - Singapore Time' },
-    { value: 'Asia/Hong_Kong', label: 'HKT - Hong Kong Time' },
-    { value: 'Asia/Shanghai', label: 'CST - China Standard Time (Shanghai)' },
-    { value: 'Asia/Beijing', label: 'CST - China Standard Time (Beijing)' },
-    { value: 'Asia/Taipei', label: 'CST - Taiwan Standard Time (Taipei)' },
-    { value: 'Asia/Tokyo', label: 'JST - Japan Standard Time (Tokyo)' },
-    { value: 'Asia/Seoul', label: 'KST - Korea Standard Time (Seoul)' },
-    { value: 'Asia/Manila', label: 'PST - Philippine Time (Manila)' },
-    { value: 'Australia/Perth', label: 'AWST - Australian Western Time (Perth)' },
-    { value: 'Australia/Adelaide', label: 'ACST - Australian Central Time (Adelaide)' },
-    { value: 'Australia/Darwin', label: 'ACST - Australian Central Time (Darwin)' },
-    { value: 'Australia/Brisbane', label: 'AEST - Australian Eastern Time (Brisbane)' },
-    { value: 'Australia/Sydney', label: 'AEST - Australian Eastern Time (Sydney)' },
-    { value: 'Australia/Melbourne', label: 'AEST - Australian Eastern Time (Melbourne)' },
-    { value: 'Pacific/Auckland', label: 'NZST - New Zealand Time (Auckland)' },
-    { value: 'Pacific/Fiji', label: 'FJT - Fiji Time' },
-    { value: 'Pacific/Honolulu', label: 'HST - Hawaii Standard Time' },
-    { value: 'America/Anchorage', label: 'AKST - Alaska Standard Time' },
-    { value: 'Atlantic/Reykjavik', label: 'GMT - Greenwich Mean Time (Reykjavik)' },
-    { value: 'Africa/Cairo', label: 'EET - Eastern European Time (Cairo)' },
-    { value: 'Africa/Johannesburg', label: 'SAST - South Africa Standard Time' },
-    { value: 'Africa/Lagos', label: 'WAT - West Africa Time (Lagos)' },
-    { value: 'Africa/Nairobi', label: 'EAT - East Africa Time (Nairobi)' },
-    { value: 'Asia/Tehran', label: 'IRST - Iran Standard Time' },
-    { value: 'Asia/Baghdad', label: 'AST - Arabia Standard Time (Baghdad)' },
-    { value: 'Asia/Riyadh', label: 'AST - Arabia Standard Time (Riyadh)' },
-    { value: 'Asia/Jerusalem', label: 'IST - Israel Standard Time' },
-  ]
-  
-  const activeDays = campaign?.schedule?.days || ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-  const currentTimezone = campaign?.schedule?.timezone || 'Asia/Karachi'
+  const activeDays = campaign?.settings?.schedule?.days || ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+  const currentTimezone = campaign?.timezone || campaign?.settings?.schedule?.timezone || 'UTC'
+  const activeHours = campaign?.settings?.schedule?.activeHours || {}
 
   return (
     <div className="max-w-2xl">
@@ -730,7 +852,7 @@ function ScheduleTab({ campaign }) {
           <div className="flex-1">
             <label className="text-muted-foreground text-sm block mb-2">from</label>
             <div className="bg-secondary border border-border rounded-lg px-4 py-3 text-foreground">
-              {campaign?.schedule?.time_from || '9:00 AM'}
+              {activeHours.start || '9:00 AM'}
             </div>
           </div>
           <div className="pt-6">
@@ -739,7 +861,7 @@ function ScheduleTab({ campaign }) {
           <div className="flex-1">
             <label className="text-muted-foreground text-sm block mb-2">to</label>
             <div className="bg-secondary border border-border rounded-lg px-4 py-3 text-foreground">
-              {campaign?.schedule?.time_to || '5:00 PM'}
+              {activeHours.end || '5:00 PM'}
             </div>
           </div>
         </div>
@@ -753,17 +875,9 @@ function ScheduleTab({ campaign }) {
           <svg className="w-5 h-5 text-muted-foreground flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
-          <select 
-            className="flex-1 bg-secondary border border-border rounded-lg px-4 py-3 text-foreground appearance-none cursor-pointer focus:outline-none focus:border-purple-500"
-            value={currentTimezone}
-            disabled
-          >
-            {timezones.map((tz) => (
-              <option key={tz.value} value={tz.value} className="bg-secondary text-foreground">
-                {tz.label}
-              </option>
-            ))}
-          </select>
+          <div className="flex-1 bg-secondary border border-border rounded-lg px-4 py-3 text-foreground">
+            {currentTimezone}
+          </div>
         </div>
       </div>
 

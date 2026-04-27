@@ -92,7 +92,12 @@ export default function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-        <BrowserRouter>
+      <BrowserRouter
+        future={{
+          v7_startTransition: true,
+          v7_relativeSplatPath: true,
+        }}
+      >
           <div className="min-h-screen bg-background">
             <Routes>
             <Route path="/auth" element={<Auth />} />
@@ -112,7 +117,7 @@ export default function App() {
               <Route path="campaigns/new" element={<CampaignBuilder />} />
               <Route path="campaigns/:id" element={<CampaignDetail />} />
               <Route path="campaigns/:id/edit" element={<CampaignBuilder />} />
-              <Route path="lead-extractor" element={<LeadExtractor />} />
+              <Route path="prospect-extractor" element={<LeadExtractor />} />
               <Route path="leads" element={<LeadDatabase />} />
               <Route path="content" element={<ContentAssistant />} />
               <Route path="inbound" element={<InboundAutomations />} />

@@ -269,14 +269,8 @@ create policy shared_reports_mutate
 -- PG_CRON — nightly daily-send counter reset
 --
 -- linkedin_accounts tracks two rolling daily counters:
---   daily_connections_sent  int not null default 0
---   daily_messages_sent     int not null default 0
--- If those columns do not yet exist, run the migration below once:
---
---   alter table linkedin_accounts
---     add column if not exists daily_connections_sent int not null default 0,
---     add column if not exists daily_messages_sent    int not null default 0;
---
+--   today_connections  int not null default 0
+--   today_messages     int not null default 0
 -- The cron job fires at 00:00 UTC every day and resets both counters
 -- so the per-account daily throttle window starts fresh.
 -- ============================================================
@@ -293,11 +287,11 @@ select cron.schedule(
   $$
     update linkedin_accounts
     set
-      daily_connections_sent = 0,
-      daily_messages_sent    = 0,
-      updated_at             = now()
+      today_connections = 0,
+      today_messages    = 0,
+      updated_at        = now()
     where
-      daily_connections_sent > 0
-      or daily_messages_sent > 0;     -- skip no-op rows to reduce WAL churn
+      today_connections > 0
+      or today_messages > 0;          -- skip no-op rows to reduce WAL churn
   $$
 );

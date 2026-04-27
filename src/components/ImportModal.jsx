@@ -14,7 +14,7 @@ import { useImportLeads } from '@/hooks/useLeads'
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-import { Upload, X, Check, FileText, AlertCircle } from 'lucide-react'
+import { Upload, X, FileText } from 'lucide-react'
 import { z } from 'zod'
 
 const DATABASE_FIELDS = [
@@ -119,15 +119,15 @@ export function ImportModal({ isOpen, onClose }) {
 
         {!file ? (
           <div {...getRootProps()} className={`mt-4 border-2 border-dashed rounded-lg p-12 text-center transition-all cursor-pointer ${
-            isDragActive ? 'border-purple-500 bg-purple-500/10' : 'border-white/10 hover:border-white/20'
+            isDragActive ? 'border-purple-500 bg-purple-500/10' : 'border-[var(--color-border)] hover:border-[var(--color-ring)]'
           }`}>
             <input {...getInputProps()} />
-            <Upload className="h-12 w-12 text-[#94a3b8] mx-auto mb-4" />
-            <p className="text-white font-medium">Click or drag CSV file here</p>
+            <Upload className="h-12 w-12 text-[var(--color-text-secondary)] mx-auto mb-4" />
+            <p className="text-[var(--color-text-primary)] font-medium">Click or drag CSV file here</p>
           </div>
         ) : (
           <div className="space-y-6 mt-4">
-            <div className="flex items-center justify-between bg-white/5 p-3 rounded-md border border-white/10">
+            <div className="flex items-center justify-between bg-[var(--color-input)] p-3 rounded-md border border-[var(--color-border)]">
               <div className="flex items-center gap-3">
                 <FileText className="h-5 w-5 text-purple-500" />
                 <span className="text-white text-sm font-medium">{file.name}</span>
@@ -173,7 +173,7 @@ export function ImportModal({ isOpen, onClose }) {
                           </Select>
                         </TableCell>
                         {mappedLeads.map((lead, i) => (
-                          <TableCell key={i} className={`text-xs ${!lead.isValid && lead.errors?.[field.key] ? 'text-red-400' : 'text-[#94a3b8]'}`}>
+                          <TableCell key={i} className={`text-xs ${!lead.isValid && lead.errors?.[field.key] ? 'text-red-400' : 'text-[var(--color-text-secondary)]'}`}>
                             {lead.data[field.key] || '-'}
                             {!lead.isValid && lead.errors?.[field.key] && (
                               <div className="text-[10px] mt-1 text-red-500 font-medium">

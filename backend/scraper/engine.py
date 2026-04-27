@@ -141,14 +141,36 @@ class LinkedInScraper:
             # Also try to get company and title if available
             company = ""
             title = ""
-            
-            company_el = await page.query_selector(
-                "div[data-test-id='experience-section'] li:first-child .experience-item__subtitle, "
-                "div[data-test-id='experience-section'] li:first-child .t-14"
-            )
-            if company_el:
-                company = await company_el.inner_text() or ""
-                company = company.strip()
+
+            title_selectors = [
+                "div[data-test-id='experience-section'] li:first-child .experience-item__title",
+                "div[data-test-id='experience-section'] li:first-child .t-bold span[aria-hidden]",
+                "section[data-section='experience'] li:first-child .t-bold span",
+                ".pv-profile-section__list-item:first-child .pv-entity__summary-info h3",
+                "div.pvs-list__item--line-separated:first-child .t-bold span",
+            ]
+            for selector in title_selectors:
+                el = await page.query_selector(selector)
+                if el:
+                    text = await el.inner_text()
+                    if text and text.strip():
+                        title = text.strip()
+                        break
+
+            company_selectors = [
+                "div[data-test-id='experience-section'] li:first-child .experience-item__subtitle",
+                "div[data-test-id='experience-section'] li:first-child .t-14",
+                "section[data-section='experience'] li:first-child .t-14.t-normal span[aria-hidden]",
+                ".pv-profile-section__list-item:first-child .pv-entity__secondary-title",
+                "div.pvs-list__item--line-separated:first-child .t-14 span[aria-hidden]",
+            ]
+            for selector in company_selectors:
+                el = await page.query_selector(selector)
+                if el:
+                    text = await el.inner_text()
+                    if text and text.strip():
+                        company = text.strip()
+                        break
 
             return {
                 "full_name": full_name,
@@ -170,31 +192,34 @@ class LinkedInScraper:
         try:
             logger.info(f"Sending connection request to: {profile_url}")
             await page.goto(profile_url, wait_until="domcontentloaded", timeout=30000)
-            await page.wait_for_load_state("networkidle", timeout=15000)
-            
+            # Use a shorter networkidle wait — LinkedIn pages are heavy
+            try:
+                await page.wait_for_load_state("networkidle", timeout=8000)
+            except Exception:
+                pass  # Continue even if networkidle times out
+
             await self._check_page_errors(page)
 
-            # Try multiple Connect button selectors
+            # LinkedIn renders Connect button with aria-label="Invite <Name> to connect"
+            # or plain text "Connect" — try both
             connect_btn = page.locator(
-                "button:has-text('Connect'), "
-                "button[data-test-connect-button], "
+                "button[aria-label*='Invite'][aria-label*='connect'], "
                 "button[aria-label*='Connect'], "
-                "button.artdeco-button:has-text('Connect')"
+                "button:has-text('Connect'), "
+                "button[data-test-connect-button]"
             ).first
-            
-            if not await connect_btn.is_visible(timeout=3000):
-                # Try "More" button dropdown
+
+            if not await connect_btn.is_visible(timeout=5000):
+                # Try "More" button dropdown (button is hidden behind "...")
                 more_btn = page.locator(
-                    "button:has-text('More'), "
                     "button[aria-label='More actions'], "
-                    "button.artdeco-dropdown__trigger"
+                    "button:has-text('More')"
                 ).first
-                
+
                 if await more_btn.is_visible(timeout=3000):
                     await more_btn.click()
                     await page.wait_for_timeout(800)
-                    
-                    # Look for Connect in dropdown
+
                     connect_btn = page.locator(
                         "[role='menuitem']:has-text('Connect'), "
                         "div[role='button']:has-text('Connect'), "
@@ -209,37 +234,34 @@ class LinkedInScraper:
             await page.wait_for_timeout(1500)
 
             if message:
-                # Add note button selectors
                 add_note_btn = page.locator(
                     "button:has-text('Add a note'), "
-                    "button[data-test-add-note-button], "
-                    "button[aria-label*='note']"
+                    "button[aria-label*='note'], "
+                    "button[data-test-add-note-button]"
                 ).first
-                
+
                 if await add_note_btn.is_visible(timeout=3000):
                     await add_note_btn.click()
                     await page.wait_for_timeout(500)
-                    
-                    # Note textarea selectors
+
                     note_box = page.locator(
                         "textarea#custom-message, "
                         "textarea[name='message'], "
-                        "textarea.artdeco-text-input__input, "
-                        "[contenteditable='true']"
+                        "textarea.artdeco-text-input__input"
                     ).first
-                    
+
                     await note_box.wait_for(state="visible", timeout=5000)
                     await note_box.fill(message[:300])
 
-            # Send button selectors
+            # Send button — LinkedIn uses "Send without a note" or "Send invitation"
             send_btn = page.locator(
+                "button[aria-label='Send without a note'], "
+                "button:has-text('Send without a note'), "
                 "button:has-text('Send invitation'), "
-                "button:has-text('Send'), "
                 "button[aria-label='Send invitation'], "
-                "button[data-test-send-button], "
                 "button.artdeco-button--primary:has-text('Send')"
             ).first
-            
+
             await send_btn.wait_for(state="visible", timeout=5000)
             await send_btn.click()
             await page.wait_for_timeout(2000)
