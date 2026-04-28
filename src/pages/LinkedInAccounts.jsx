@@ -11,6 +11,7 @@ import {
 import { useDeleteAccount } from "@/hooks/useLinkedInAccounts"
 import { useToggleAccount } from "@/hooks/useLinkedInAccounts"
 import { ConnectAccountModal } from "@/components/accounts/ConnectAccountModal"
+import { AccountSettingsModal } from "@/components/accounts/AccountSettingsModal"
 import { Dialog } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -30,7 +31,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Plus, MoreVertical, RefreshCw, Trash2, Globe, RotateCcw, UserCheck } from "lucide-react"
+import { Plus, MoreVertical, RefreshCw, Trash2, Globe, RotateCcw, UserCheck, Settings } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { toast } from "react-hot-toast"
 
@@ -105,8 +106,9 @@ export default function LinkedInAccounts() {
                 <TableHead className="text-muted-foreground font-medium">Unipile Status</TableHead>
                 <TableHead className="text-muted-foreground font-medium">Type</TableHead>
                 <TableHead className="text-muted-foreground font-medium">Connection Type</TableHead>
-                <TableHead className="text-muted-foreground font-medium">Daily Requests Usage</TableHead>
-                <TableHead className="text-muted-foreground font-medium">Daily Messages Usage</TableHead>
+                <TableHead className="text-muted-foreground font-medium">Daily Connections</TableHead>
+                <TableHead className="text-muted-foreground font-medium">Weekly Connections</TableHead>
+                <TableHead className="text-muted-foreground font-medium">Daily Messages</TableHead>
                 <TableHead className="text-muted-foreground font-medium">Last Sync</TableHead>
                 <TableHead className="text-muted-foreground font-medium w-16">Actions</TableHead>
               </TableRow>
@@ -150,15 +152,18 @@ export default function LinkedInAccounts() {
 }
 
 function AccountTableRow({ account }) {
+  const [showSettings, setShowSettings] = useState(false)
   const toggleMutation = useToggleAccount()
   const deleteUnipileMutation = useDeleteUnipileAccount()
   const deleteLocalMutation = useDeleteAccount()
   const reconnectMutation = useReconnectAccount()
   const syncProfileMutation = useSyncProfile()
 
-  const connLimit = account.daily_connection_limit || 5
-  const msgLimit = account.daily_message_limit || 5
+  const connLimit = account.daily_connection_limit || 15
+  const weeklyConnLimit = account.weekly_connection_limit || 105
+  const msgLimit = account.daily_message_limit || 30
   const requestsProgress = Math.round((account.today_connections / connLimit) * 100)
+  const weeklyRequestsProgress = Math.round((account.this_week_connections / weeklyConnLimit) * 100)
   const messagesProgress = Math.round((account.today_messages / msgLimit) * 100)
 
   const getStatusBadge = () => {
@@ -205,14 +210,19 @@ function AccountTableRow({ account }) {
   }
 
   const getTypeBadge = () => {
-    const features = account.premium_features ?? []
-    if (features.includes('sales_navigator'))
-      return <Badge className="bg-amber-500/20 text-amber-400 border border-amber-500/30 text-xs">Sales Nav</Badge>
-    if (features.includes('recruiter'))
-      return <Badge className="bg-purple-500/20 text-purple-400 border border-purple-500/30 text-xs">Recruiter</Badge>
-    if (features.includes('premium'))
-      return <Badge className="bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 text-xs">Premium</Badge>
-    return <Badge variant="outline" className="text-xs text-muted-foreground border-border">Free</Badge>
+    const accountType = account.account_type || 'free'
+    
+    switch (accountType) {
+      case 'sales_navigator':
+        return <Badge className="bg-amber-500/20 text-amber-400 border border-amber-500/30 text-xs">Sales Nav</Badge>
+      case 'recruiter':
+        return <Badge className="bg-purple-500/20 text-purple-400 border border-purple-500/30 text-xs">Recruiter</Badge>
+      case 'premium':
+        return <Badge className="bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 text-xs">Premium</Badge>
+      case 'free':
+      default:
+        return <Badge variant="outline" className="text-xs text-muted-foreground border-border">Free</Badge>
+    }
   }
 
   const getConnectionTypeBadge = () => {
@@ -284,7 +294,7 @@ function AccountTableRow({ account }) {
       {/* Connection Type */}
       <TableCell>{getConnectionTypeBadge()}</TableCell>
 
-      {/* Daily Requests Usage */}
+      {/* Daily Connections Usage */}
       <TableCell>
         <div className="flex items-center gap-3">
           <span className="text-sm text-foreground whitespace-nowrap">
@@ -297,6 +307,22 @@ function AccountTableRow({ account }) {
             />
           </div>
           <span className="text-xs text-muted-foreground w-8">{requestsProgress}%</span>
+        </div>
+      </TableCell>
+
+      {/* Weekly Connections Usage */}
+      <TableCell>
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-foreground whitespace-nowrap">
+            {account.this_week_connections || 0}/{weeklyConnLimit}
+          </span>
+          <div className="w-16 h-2 bg-white/10 rounded-full overflow-hidden">
+            <div 
+              className="h-full bg-info rounded-full"
+              style={{ width: `${Math.min(weeklyRequestsProgress, 100)}%` }}
+            />
+          </div>
+          <span className="text-xs text-muted-foreground w-8">{weeklyRequestsProgress}%</span>
         </div>
       </TableCell>
 
@@ -363,6 +389,14 @@ function AccountTableRow({ account }) {
             )}
             <DropdownMenuSeparator className="bg-white/10" />
             <DropdownMenuItem 
+              onClick={() => setShowSettings(true)}
+              className="text-sm text-foreground focus:bg-secondary cursor-pointer"
+            >
+              <Settings className="mr-2 h-4 w-4" />
+              Settings
+            </DropdownMenuItem>
+            <DropdownMenuSeparator className="bg-white/10" />
+            <DropdownMenuItem 
               onClick={handleDelete}
               disabled={deleteUnipileMutation.isPending || deleteLocalMutation.isPending}
               className="text-sm text-destructive focus:bg-secondary cursor-pointer"
@@ -372,6 +406,13 @@ function AccountTableRow({ account }) {
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+
+        {/* Settings Modal */}
+        <AccountSettingsModal 
+          account={account}
+          open={showSettings}
+          onClose={() => setShowSettings(false)}
+        />
       </TableCell>
     </TableRow>
   )

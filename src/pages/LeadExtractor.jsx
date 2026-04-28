@@ -294,101 +294,125 @@ export default function LeadExtractor() {
                 </TableCell>
               </TableRow>
             ) : (
-              filteredExtractions.map((extraction) => (
-                <TableRow key={extraction.id} className="border-[var(--color-border)] hover:bg-[var(--color-border)]">
-                  <TableCell>
-                    <div className="flex items-center gap-[var(--space-2)]">
-                      <div className="h-8 w-8 rounded-xs bg-[var(--color-border)] flex items-center justify-center">
-                        <Search className="h-4 w-4 text-[var(--color-text-secondary)]" />
-                      </div>
-                      <div>
-                        <div className="font-medium text-[var(--color-text-on-strong)]">{extraction.campaigns?.name || 'Untitled Extraction'}</div>
-                        <div className="text-xs text-[var(--color-text-secondary)]">{format(new Date(extraction.created_at), 'M/d/yyyy')}</div>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-[var(--color-text-secondary)] text-sm">
-                    {format(new Date(extraction.created_at), 'h:mm a')}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-[var(--space-1)]">
-                      <Avatar className="h-6 w-6">
-                        <AvatarImage src={extraction.linkedin_accounts?.avatar_url} />
-                        <AvatarFallback className="bg-[var(--color-surface-raised)]/10 text-[var(--color-surface-raised)] text-xs">
-                          {extraction.linkedin_accounts?.full_name?.charAt(0) || '?'}
-                        </AvatarFallback>
-                      </Avatar>
-                      <span className="text-[var(--color-text-on-strong)] text-sm">{extraction.linkedin_accounts?.full_name || 'Unknown Account'}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge className="bg-[var(--color-surface-raised)]/10 text-[var(--color-surface-raised)] border-[var(--color-surface-raised)]/20 text-xs">
-                      Search Extraction
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <LeadCount extractionId={extraction.id} workspaceId={workspaceId} />
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={`text-xs capitalize ${
-                      extraction.status === 'done' || extraction.status === 'processing'
-                        ? 'bg-[oklch(var(--success)/0.1)] text-[oklch(var(--success))] border-[oklch(var(--success)/0.2)]'
-                        : extraction.status === 'failed'
-                          ? 'bg-[oklch(var(--destructive)/0.1)] text-[oklch(var(--destructive))] border-[oklch(var(--destructive)/0.2)]'
-                          : 'bg-[var(--color-border)] text-[var(--color-text-secondary)] border-[var(--color-border)]'
-                    }`}>
-                      {extraction.status === 'done' ? 'Finished'
-                        : extraction.status === 'processing' ? 'Processing'
-                        : extraction.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-[var(--color-text-secondary)] hover:text-[var(--color-text-on-strong)]">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="bg-[var(--color-surface-strong)] border-[var(--color-border)] rounded-xs">
-                        <DropdownMenuItem
-                          onClick={() => handleViewDetails(extraction.id)}
-                          className="text-[var(--color-text-on-strong)] focus:bg-[var(--color-border)] cursor-pointer"
-                        >
-                          <FileText className="h-4 w-4 mr-2" />
-                          View Details
-                        </DropdownMenuItem>
-                        <DropdownMenuItem className="text-[var(--color-text-on-strong)] focus:bg-[var(--color-border)] cursor-pointer">
-                          <ExternalLink className="h-4 w-4 mr-2" />
-                          View Source
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator className="bg-[var(--color-border)]" />
-                        <DropdownMenuItem
-                          onClick={() => handleAddToCampaign(extraction.id)}
-                          className="text-[var(--color-text-on-strong)] focus:bg-[var(--color-border)] cursor-pointer"
-                        >
-                          <Send className="h-4 w-4 mr-2" />
-                          Add to Campaign
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => handleExportLeads(extraction.id)}
-                          className="text-[var(--color-text-on-strong)] focus:bg-[var(--color-border)] cursor-pointer"
-                        >
-                          <Download className="h-4 w-4 mr-2" />
-                          Export Leads
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator className="bg-[var(--color-border)]" />
-                        <DropdownMenuItem
-                          onClick={() => openDeleteModal(extraction.id)}
-                          className="text-[oklch(var(--destructive))] focus:bg-[oklch(var(--destructive)/0.08)] focus:text-[oklch(var(--destructive))] cursor-pointer"
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))
+              (() => {
+                // Group extractions by date
+                const groups = filteredExtractions.reduce((acc, ext) => {
+                  const dateKey = format(new Date(ext.created_at), 'MMMM d, yyyy')
+                  if (!acc[dateKey]) acc[dateKey] = []
+                  acc[dateKey].push(ext)
+                  return acc
+                }, {})
+
+                return Object.entries(groups).map(([date, items]) => (
+                  <>
+                    {/* Date separator row */}
+                    <TableRow key={`date-${date}`} className="border-[var(--color-border)] hover:bg-transparent">
+                      <TableCell colSpan={7} className="py-2 px-4">
+                        <span className="text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider">
+                          {date}
+                        </span>
+                      </TableCell>
+                    </TableRow>
+
+                    {items.map((extraction) => (
+                      <TableRow key={extraction.id} className="border-[var(--color-border)] hover:bg-[var(--color-border)]">
+                        <TableCell>
+                          <div className="flex items-center gap-[var(--space-2)]">
+                            <div className="h-8 w-8 rounded-xs bg-[var(--color-border)] flex items-center justify-center">
+                              <Search className="h-4 w-4 text-[var(--color-text-secondary)]" />
+                            </div>
+                            <div>
+                              <div className="font-medium text-[var(--color-text-on-strong)]">{extraction.campaigns?.name || 'Untitled Extraction'}</div>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-[var(--color-text-secondary)] text-sm">
+                          {format(new Date(extraction.created_at), 'h:mm a')}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-[var(--space-1)]">
+                            <Avatar className="h-6 w-6">
+                              <AvatarImage src={extraction.linkedin_accounts?.avatar_url} />
+                              <AvatarFallback className="bg-[var(--color-surface-raised)]/10 text-[var(--color-surface-raised)] text-xs">
+                                {extraction.linkedin_accounts?.full_name?.charAt(0) || '?'}
+                              </AvatarFallback>
+                            </Avatar>
+                            <span className="text-[var(--color-text-on-strong)] text-sm">{extraction.linkedin_accounts?.full_name || 'Unknown Account'}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge className="bg-[var(--color-surface-raised)]/10 text-[var(--color-surface-raised)] border-[var(--color-surface-raised)]/20 text-xs">
+                            Search Extraction
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <LeadCount extractionId={extraction.id} workspaceId={workspaceId} />
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={`text-xs capitalize ${
+                            extraction.status === 'done'
+                              ? 'bg-[oklch(var(--success)/0.1)] text-[oklch(var(--success))] border-[oklch(var(--success)/0.2)]'
+                              : extraction.status === 'processing'
+                                ? 'bg-amber-500/10 text-amber-500 border-amber-500/25'
+                                : extraction.status === 'failed'
+                                  ? 'bg-[oklch(var(--destructive)/0.1)] text-[oklch(var(--destructive))] border-[oklch(var(--destructive)/0.2)]'
+                                  : 'bg-[var(--color-border)] text-[var(--color-text-secondary)] border-[var(--color-border)]'
+                          }`}>
+                            {extraction.status === 'done' ? 'Finished'
+                              : extraction.status === 'processing' ? 'Processing'
+                              : extraction.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-[var(--color-text-secondary)] hover:text-[var(--color-text-on-strong)]">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="bg-[var(--color-surface-strong)] border-[var(--color-border)] rounded-xs">
+                              <DropdownMenuItem
+                                onClick={() => handleViewDetails(extraction.id)}
+                                className="text-[var(--color-text-on-strong)] focus:bg-[var(--color-border)] cursor-pointer"
+                              >
+                                <FileText className="h-4 w-4 mr-2" />
+                                View Details
+                              </DropdownMenuItem>
+                              <DropdownMenuItem className="text-[var(--color-text-on-strong)] focus:bg-[var(--color-border)] cursor-pointer">
+                                <ExternalLink className="h-4 w-4 mr-2" />
+                                View Source
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator className="bg-[var(--color-border)]" />
+                              <DropdownMenuItem
+                                onClick={() => handleAddToCampaign(extraction.id)}
+                                className="text-[var(--color-text-on-strong)] focus:bg-[var(--color-border)] cursor-pointer"
+                              >
+                                <Send className="h-4 w-4 mr-2" />
+                                Add to Campaign
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => handleExportLeads(extraction.id)}
+                                className="text-[var(--color-text-on-strong)] focus:bg-[var(--color-border)] cursor-pointer"
+                              >
+                                <Download className="h-4 w-4 mr-2" />
+                                Export Leads
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator className="bg-[var(--color-border)]" />
+                              <DropdownMenuItem
+                                onClick={() => openDeleteModal(extraction.id)}
+                                className="text-[oklch(var(--destructive))] focus:bg-[oklch(var(--destructive)/0.08)] focus:text-[oklch(var(--destructive))] cursor-pointer"
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </>
+                ))
+              })()
             )}
           </TableBody>
         </Table>

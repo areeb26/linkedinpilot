@@ -3,7 +3,7 @@ import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { MoreVertical, Play, Pause, Edit2, Copy, Trash2, Users, CheckCircle, MessageSquare, DollarSign } from 'lucide-react'
+import { MoreVertical, Play, Pause, Edit2, Copy, Trash2, Users, CheckCircle, MessageSquare, DollarSign, CheckCircle2 } from 'lucide-react'
 import { useLaunchCampaign, usePauseCampaign, useDuplicateCampaign, useDeleteCampaign } from '@/hooks/useCampaigns'
 import { Link } from 'react-router-dom'
 import { cn } from '@/lib/utils'
@@ -23,10 +23,17 @@ export default function CampaignCard({ campaign }) {
   const deleteMutation = useDeleteCampaign()
 
   const { stats = {} } = campaign
-  const style = statusStyles[campaign.status] || statusStyles.draft
+  const displayStatus = campaign.displayStatus ?? campaign.status
+  const style = statusStyles[displayStatus] || statusStyles.draft
 
   return (
     <Card className="bg-card border-border hover:border-primary/30 transition-all duration-200 group overflow-hidden">
+      {displayStatus === 'completed' && (
+        <div className="flex items-center gap-2 px-5 py-2 bg-primary/10 border-b border-primary/20">
+          <CheckCircle2 className="w-3.5 h-3.5 text-primary shrink-0" />
+          <span className="text-[11px] font-semibold text-primary">All sequences completed</span>
+        </div>
+      )}
       <div className="p-5">
         <div className="flex items-start justify-between mb-4">
           <div className="space-y-1">
@@ -41,7 +48,7 @@ export default function CampaignCard({ campaign }) {
                 {campaign.type}
               </Badge>
               <span className={cn('text-[10px] font-semibold uppercase tracking-wide', style.text)}>
-                {campaign.status}
+                {displayStatus}
               </span>
             </div>
           </div>
@@ -97,7 +104,7 @@ export default function CampaignCard({ campaign }) {
           </div>
 
           <div className="flex gap-2">
-            {campaign.status === 'active' ? (
+            {displayStatus === 'active' ? (
               <Button
                 size="sm"
                 variant="outline"
@@ -111,7 +118,7 @@ export default function CampaignCard({ campaign }) {
                 size="sm"
                 className="h-8 bg-primary hover:bg-primary/90 text-primary-foreground border-none px-4"
                 onClick={() => launchMutation.mutate(campaign.id)}
-                disabled={campaign.status === 'completed'}
+                disabled={displayStatus === 'completed'}
               >
                 <Play className="w-3 h-3 mr-2 fill-current" /> Launch
               </Button>

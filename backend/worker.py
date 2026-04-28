@@ -16,6 +16,7 @@ import sys
 from datetime import datetime, timezone
 from typing import Set
 
+import pytz
 from dotenv import load_dotenv
 
 from utils.db import get_supabase
@@ -75,7 +76,7 @@ async def fetch_pending_actions():
     
     except Exception as e:
         # Check if it's a network error
-        if "getaddrinfo failed" in str(e) or "Failed to resolve" in str(e):
+        if any(msg in str(e) for msg in ["getaddrinfo failed", "Failed to resolve", "Name or service not known", "nodename nor servname provided"]):
             logger.warning(f"Network error fetching actions (DNS resolution failed). Will retry next poll.")
         else:
             logger.error(f"Error fetching pending actions: {e}")
@@ -112,6 +113,7 @@ async def sync_connections():
     1. Fetches all connections from Unipile and updates leads with
        connection_status='connected' if they are in the connections list.
     2. Fetches recent chats and messages to detect replies.
+    3. Updates campaign statuses when all leads are processed.
     """
     supabase = get_supabase()
     
@@ -128,6 +130,7 @@ async def sync_connections():
         accounts = response.data
         total_connections_updated = 0
         total_messages_synced = 0
+        campaigns_completed = 0
         
         for account in accounts:
             account_id = account['id']
@@ -176,18 +179,25 @@ async def sync_connections():
                         for lead in leads:
                             linkedin_member_id = lead.get('linkedin_member_id')
                             current_status = lead.get('connection_status')
+                            lead_id = lead.get('id')
                             
                             if linkedin_member_id and linkedin_member_id in connected_provider_ids:
                                 if current_status != 'connected':
                                     try:
+                                        # Update lead connection status
                                         supabase.table('leads').update({
                                             'connection_status': 'connected'
-                                        }).eq('id', lead['id']).execute()
+                                        }).eq('id', lead_id).execute()
                                         
-                                        logger.info(f"Updated {lead.get('full_name', 'Unknown')} to 'connected'")
+                                        # Also update campaign enrollment status to 'connected'
+                                        supabase.table('campaign_enrollments').update({
+                                            'status': 'connected'
+                                        }).eq('lead_id', lead_id).execute()
+                                        
+                                        logger.info(f"Updated {lead.get('full_name', 'Unknown')} to 'connected' (lead and enrollment)")
                                         total_connections_updated += 1
                                     except Exception as e:
-                                        logger.error(f"Failed to update lead {lead['id']}: {e}")
+                                        logger.error(f"Failed to update lead {lead_id}: {e}")
             
             # ===== SYNC MESSAGES =====
             # Fetch recent chats to detect new replies
@@ -287,14 +297,109 @@ async def sync_connections():
             except Exception as e:
                 logger.error(f"Error fetching chats for {account_name}: {e}")
         
-        if total_connections_updated > 0 or total_messages_synced > 0:
-            logger.info(f"Sync complete: {total_connections_updated} connection(s), {total_messages_synced} message(s)")
+        # ===== UPDATE CAMPAIGN STATUSES =====
+        # Check for campaigns that should be marked as completed or paused (end date passed)
+        try:
+            # Get all active campaigns
+            campaigns_response = supabase.table('campaigns').select('id, name, workspace_id, settings, timezone').eq('status', 'active').execute()
+            
+            if campaigns_response.data:
+                for campaign in campaigns_response.data:
+                    campaign_id = campaign['id']
+                    campaign_name = campaign['name']
+                    workspace_id = campaign['workspace_id']
+                    settings = campaign.get('settings', {})
+                    campaign_timezone = campaign.get('timezone', 'UTC')
+                    
+                    # ===== CHECK END DATE =====
+                    # If campaign has an end date and it has passed, pause the campaign
+                    schedule_settings = settings.get('schedule', {}) if isinstance(settings, dict) else {}
+                    end_date_str = schedule_settings.get('endDate')
+                    
+                    if end_date_str:
+                        try:
+                            # Parse end date (format: YYYY-MM-DD)
+                            end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+                            
+                            # Get current date in campaign's timezone
+                            tz = pytz.timezone(campaign_timezone)
+                            current_date = datetime.now(tz).date()
+                            
+                            # If end date has passed, pause the campaign
+                            if current_date > end_date:
+                                try:
+                                    supabase.table('campaigns').update({
+                                        'status': 'paused',
+                                    }).eq('id', campaign_id).execute()
+                                    
+                                    logger.info(f"Campaign '{campaign_name}' auto-paused (end date {end_date_str} passed)")
+                                    campaigns_completed += 1
+                                    continue  # Skip to next campaign, don't check completion
+                                    
+                                except Exception as e:
+                                    logger.error(f"Failed to pause campaign {campaign_id} (end date passed): {e}")
+                        
+                        except Exception as e:
+                            logger.warning(f"Failed to parse end date for campaign {campaign_id}: {e}")
+                    
+                    # Get enrollments for this campaign
+                    enrollments_response = supabase.table('campaign_enrollments').select('id, lead_id, status').eq('campaign_id', campaign_id).eq('workspace_id', workspace_id).execute()
+                    
+                    if not enrollments_response.data:
+                        continue  # No enrollments, skip
+                    
+                    enrollments = enrollments_response.data
+                    enrolled_count = len(enrollments)
+                    
+                    # Check if all enrollments are in a terminal state
+                    # Terminal states: connected, replied, completed, failed, unsubscribed, bounced, error
+                    terminal_states = ['connected', 'replied', 'completed', 'failed', 'unsubscribed', 'bounced', 'error']
+                    terminal_count = len([e for e in enrollments if e['status'] in terminal_states])
+                    
+                    # Also check for pending actions
+                    lead_ids = [e['lead_id'] for e in enrollments]
+                    pending_actions_response = supabase.table('action_queue').select('id').eq('workspace_id', workspace_id).in_('lead_id', lead_ids).eq('status', 'pending').execute()
+                    pending_actions_count = len(pending_actions_response.data) if pending_actions_response.data else 0
+                    
+                    # Campaign is complete if:
+                    # 1. All enrollments are in terminal states AND no pending actions, OR
+                    # 2. At least 80% of enrollments are in terminal states AND no pending actions
+                    completion_threshold = enrolled_count * 0.8
+                    
+                    should_complete = False
+                    completion_reason = ""
+                    
+                    if terminal_count >= enrolled_count and pending_actions_count == 0:
+                        should_complete = True
+                        completion_reason = f"all {enrolled_count} leads processed"
+                    elif terminal_count >= completion_threshold and pending_actions_count == 0:
+                        should_complete = True
+                        completion_reason = f"{terminal_count}/{enrolled_count} leads processed (80% threshold)"
+                    
+                    if should_complete:
+                        try:
+                            supabase.table('campaigns').update({
+                                'status': 'completed',
+                                'completed_at': datetime.now(timezone.utc).isoformat()
+                            }).eq('id', campaign_id).execute()
+                            
+                            logger.info(f"Campaign '{campaign_name}' marked as completed ({completion_reason})")
+                            campaigns_completed += 1
+                            
+                        except Exception as e:
+                            logger.error(f"Failed to update campaign {campaign_id} status: {e}")
+        
+        except Exception as e:
+            logger.error(f"Error updating campaign statuses: {e}")
+        
+        if total_connections_updated > 0 or total_messages_synced > 0 or campaigns_completed > 0:
+            logger.info(f"Sync complete: {total_connections_updated} connection(s), {total_messages_synced} message(s), {campaigns_completed} campaign(s) completed")
         else:
             logger.debug("Sync complete: no updates needed")
             
     except Exception as e:
         # Check if it's a network/DNS error
-        if "getaddrinfo failed" in str(e) or "Failed to resolve" in str(e) or "Connection" in str(e):
+        if any(msg in str(e) for msg in ["getaddrinfo failed", "Failed to resolve", "Name or service not known", "nodename nor servname provided", "Connection"]):
             logger.warning(f"Network error in connection sync (will retry next cycle): {e}")
         else:
             logger.error(f"Error in connection sync: {e}")
@@ -400,18 +505,18 @@ async def main():
     semaphore = asyncio.Semaphore(MAX_CONCURRENT)
 
     # Register signal handlers for graceful shutdown.
-    # Use asyncio-safe handlers where supported (Unix); fall back to signal.signal on Windows.
+    # Use asyncio-safe handlers where supported (Unix only).
+    # On Windows, loop.add_signal_handler is not implemented, and signal.signal(SIGINT)
+    # can fire spuriously when spawned by concurrently/npm, killing the worker immediately.
+    # Instead we rely on KeyboardInterrupt (caught in __main__) for Windows shutdown.
     loop = asyncio.get_running_loop()
     try:
         loop.add_signal_handler(signal.SIGINT, lambda: signal_handler(signal.SIGINT, None))
         loop.add_signal_handler(signal.SIGTERM, lambda: signal_handler(signal.SIGTERM, None))
     except (NotImplementedError, AttributeError):
-        # Windows: loop.add_signal_handler is not supported — use signal.signal instead
-        signal.signal(signal.SIGINT, signal_handler)
-        try:
-            signal.signal(signal.SIGTERM, signal_handler)
-        except (OSError, ValueError):
-            pass  # SIGTERM not available on Windows
+        # Windows: skip signal.signal registration to avoid spurious SIGINT from npm/concurrently.
+        # Graceful shutdown is handled via KeyboardInterrupt in __main__.
+        pass
     
     logger.info("=" * 60)
     logger.info("LinkedPilot Queue Worker")
@@ -440,5 +545,6 @@ if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
+        running = False
         logger.info("Worker interrupted by user")
         sys.exit(0)

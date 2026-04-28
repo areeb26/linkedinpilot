@@ -1,8 +1,15 @@
 import { useState } from 'react'
-import { useCampaigns, useDuplicateCampaign, useDeleteCampaign, useUpdateCampaign } from '@/hooks/useCampaigns'
+import { useCampaigns, useDuplicateCampaign, useDeleteCampaign, useUpdateCampaign, useCampaignCompletionNotifier } from '@/hooks/useCampaigns'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -35,6 +42,12 @@ const statusStyles = {
     bg:     'bg-[oklch(var(--warning)/0.1)]',
     border: 'border-[oklch(var(--warning)/0.25)]',
   },
+  'date-passed': {
+    dot:    'bg-[oklch(var(--destructive))]',
+    text:   'text-[oklch(var(--destructive))]',
+    bg:     'bg-[oklch(var(--destructive)/0.1)]',
+    border: 'border-[oklch(var(--destructive)/0.25)]',
+  },
   draft: {
     dot:    'bg-[var(--color-text-secondary)]',
     text:   'text-[var(--color-text-secondary)]',
@@ -52,6 +65,7 @@ const statusStyles = {
 export default function Campaigns() {
   const navigate = useNavigate()
   const { data: campaigns = [], isLoading, isError, error } = useCampaigns()
+  useCampaignCompletionNotifier()
   const duplicateMutation = useDuplicateCampaign()
   const deleteMutation = useDeleteCampaign()
   const updateMutation = useUpdateCampaign()
@@ -59,6 +73,23 @@ export default function Campaigns() {
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const itemsPerPage = 10
+  const [nameModalOpen, setNameModalOpen] = useState(false)
+  const [newCampaignName, setNewCampaignName] = useState('')
+  const [deleteTarget, setDeleteTarget] = useState(null) // { id, name }
+
+  const openNameModal = () => {
+    const today = new Date()
+    const dateStr = today.toLocaleDateString('en-GB') // DD/MM/YYYY
+    setNewCampaignName(`My Campaign ${dateStr}`)
+    setNameModalOpen(true)
+  }
+
+  const handleCreateCampaign = () => {
+    const name = newCampaignName.trim()
+    if (!name) return
+    setNameModalOpen(false)
+    navigate('/campaigns/new', { state: { campaignName: name } })
+  }
 
   const handleTogglePause = async (campaign) => {
     const newStatus = campaign.status === 'active' ? 'paused' : 'active'
@@ -129,12 +160,10 @@ export default function Campaigns() {
           <h1 className="text-2xl font-bold text-[var(--color-text-on-strong)] tracking-tight">Campaigns</h1>
           <span className="text-[var(--color-text-secondary)] text-sm">{campaigns.length} campaigns</span>
         </div>
-        <Button asChild>
-          <Link to="/campaigns/new">
+        <Button onClick={openNameModal}>
             <Plus className="w-4 h-4 mr-2" aria-hidden="true" />
             Create new Campaign
-          </Link>
-        </Button>
+          </Button>
       </div>
 
       {/* Filter bar */}
@@ -254,8 +283,12 @@ export default function Campaigns() {
                   const msgSent = stats.messagesSent || 0
                   const replies = stats.repliesReceived || 0
 
-                  // Use displayStatus from hook (already accounts for completed campaigns)
-                  const displayStatus = campaign.displayStatus ?? campaign.status
+                  // Determine display status - show "date-passed" if paused and end date passed
+                  let displayStatus = campaign.displayStatus ?? campaign.status
+                  if (campaign.status === 'paused' && campaign.isEndDatePassed) {
+                    displayStatus = 'date-passed'
+                  }
+                  
                   const style = statusStyles[displayStatus] ?? statusStyles.draft
 
                   const connSentMetric     = formatMetric(connSent, enrolled)
@@ -278,7 +311,7 @@ export default function Campaigns() {
                               'text-xs px-2 py-0.5 rounded-sm border',
                               style.bg, style.text, style.border,
                             )}>
-                              {displayStatus.charAt(0).toUpperCase() + displayStatus.slice(1)}
+                              {displayStatus === 'date-passed' ? 'Date Passed' : displayStatus.charAt(0).toUpperCase() + displayStatus.slice(1)}
                             </span>
                           </div>
                         </div>
@@ -343,7 +376,7 @@ export default function Campaigns() {
                             variant="ghost"
                             size="sm"
                             className="h-8 w-8 p-0 text-[var(--color-text-secondary)] hover:text-[oklch(var(--destructive))]"
-                            onClick={() => deleteMutation.mutate(campaign.id)}
+                            onClick={() => setDeleteTarget({ id: campaign.id, name: campaign.name })}
                             disabled={deleteMutation.isPending}
                             aria-label={`Delete ${campaign.name}`}
                           >
@@ -412,14 +445,62 @@ export default function Campaigns() {
             </p>
           </div>
           <Button asChild variant="outline">
-            <Link to="/campaigns/new">
+            <button onClick={openNameModal}>
               <Plus className="w-4 h-4 mr-2" aria-hidden="true" />
               Create your first campaign
-            </Link>
+            </button>
           </Button>
         </div>
       )}
       </div>
+
+      {/* Campaign name modal */}
+      <Dialog open={nameModalOpen} onOpenChange={setNameModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Set up new campaign</DialogTitle>
+            <p className="text-sm text-muted-foreground">What would you like to name it? You can change this later in settings.</p>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            <label className="text-sm font-medium">Campaign name</label>
+            <Input
+              value={newCampaignName}
+              onChange={(e) => setNewCampaignName(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleCreateCampaign()}
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setNameModalOpen(false)}>Cancel</Button>
+            <Button onClick={handleCreateCampaign} disabled={!newCampaignName.trim()}>Create</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirmation dialog */}
+      <Dialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete campaign?</DialogTitle>
+            <p className="text-sm text-muted-foreground">
+              Are you sure you want to delete <span className="font-medium text-foreground">"{deleteTarget?.name}"</span>? This action cannot be undone.
+            </p>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setDeleteTarget(null)}>Cancel</Button>
+            <Button
+              variant="destructive"
+              disabled={deleteMutation.isPending}
+              onClick={() => {
+                deleteMutation.mutate(deleteTarget.id)
+                setDeleteTarget(null)
+              }}
+            >
+              {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -12,8 +12,24 @@ const ITEMS_PER_PAGE = 10
 export function LeadReview() {
   const { campaignData, updateCampaignData, nextStep, prevStep } = useWizard()
   const [search, setSearch] = useState('')
-  const [selectedLeads, setSelectedLeads] = useState(new Set())
+  // Initialize selectedLeads from previously saved selection, or default to all leads selected
+  const [selectedLeads, setSelectedLeads] = useState(() => {
+    if (campaignData.selectedLeadIds?.length > 0) {
+      return new Set(campaignData.selectedLeadIds)
+    }
+    return new Set(campaignData.leads.map(l => l.id))
+  })
   const [currentPage, setCurrentPage] = useState(1)
+
+  const handleBack = () => {
+    // If leads came from CSV, clear them so CampaignBuilder shows CSVUpload again
+    // Keep _csvParsedData so CSVUpload can restore the file state
+    if (campaignData.leadSource === 'csv') {
+      updateCampaignData({ leads: [] })
+    } else {
+      prevStep()
+    }
+  }
 
   const filteredLeads = campaignData.leads.filter(lead => {
     const searchLower = search.toLowerCase()
@@ -47,9 +63,15 @@ export function LeadReview() {
   }
 
   const handleContinue = () => {
-    // Filter to selected leads only
-    const finalLeads = campaignData.leads.filter(l => selectedLeads.has(l.id))
-    updateCampaignData({ leads: finalLeads.length > 0 ? finalLeads : campaignData.leads })
+    if (campaignData.leads.length === 0) return
+
+    // Persist the selection so it's restored when coming back
+    // Keep all leads in campaignData.leads — selection is tracked separately
+    const selection = selectedLeads.size > 0
+      ? Array.from(selectedLeads)
+      : campaignData.leads.map(l => l.id) // nothing checked = all selected
+
+    updateCampaignData({ selectedLeadIds: selection })
     nextStep()
   }
 
@@ -151,14 +173,22 @@ export function LeadReview() {
       </div>
 
       <div className="flex items-center justify-between pt-4 border-t">
-        <Button variant="outline" onClick={prevStep}>
+        <Button variant="outline" onClick={handleBack}>
           <ChevronLeft className="w-4 h-4 mr-2" /> Back
         </Button>
         <div className="flex items-center gap-2">
           <p className="text-sm text-muted-foreground">
-            {selectedLeads.size > 0 ? `${selectedLeads.size} leads selected` : 'All leads will be added'}
+            {selectedLeads.size > 0
+              ? `${selectedLeads.size} leads selected`
+              : campaignData.leads.length > 0
+                ? `All ${campaignData.leads.length} leads selected`
+                : <span className="text-destructive">No leads to add</span>
+            }
           </p>
-          <Button onClick={handleContinue}>
+          <Button
+            onClick={handleContinue}
+            disabled={campaignData.leads.length === 0}
+          >
             Continue to LinkedIn Accounts
           </Button>
         </div>

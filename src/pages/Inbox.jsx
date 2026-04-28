@@ -358,7 +358,7 @@ export default function Inbox() {
                 // Unipile API uses 'is_sender' field as a number (1 or 0), not boolean
                 // is_sender: 1 = your message (outbound, right side)
                 // is_sender: 0 = their message (inbound, left side)
-                const isOutbound = msg.is_sender === 1 || msg.is_sender === true
+                const isOutbound = msg.is_sender === 1
                 const body = msg.text ?? msg.body ?? ''
                 const timestamp = msg.timestamp ?? msg.date
 

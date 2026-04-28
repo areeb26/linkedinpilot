@@ -96,6 +96,11 @@ export function LeadExtractorWizard({ isOpen, onOpenChange }) {
     const extractionType = SOURCE_TO_EXTRACTION_TYPE[selectedSource] || 'search'
 
     try {
+      // Pre-generate the action_queue UUID so the payload can reference it
+      // in the same insert — eliminates the race condition where the extension
+      // could pick up the action before the second update sets action_queue_id.
+      const actionQueueId = crypto.randomUUID()
+
       // 1. Create the campaign
       const { data: campaign, error: campaignError } = await supabase
         .from('campaigns')
@@ -117,10 +122,11 @@ export function LeadExtractorWizard({ isOpen, onOpenChange }) {
 
       if (campaignError) throw campaignError
 
-      // 2. Queue the action for the extension
-      const { data: queuedAction, error: queueError } = await supabase
+      // 2. Queue the action — payload is complete in a single insert, no second update needed
+      const { error: queueError } = await supabase
         .from('action_queue')
         .insert([{
+          id: actionQueueId,
           workspace_id: workspaceId,
           linkedin_account_id: selectedAccountId,
           campaign_id: campaign.id,
@@ -130,31 +136,12 @@ export function LeadExtractorWizard({ isOpen, onOpenChange }) {
             campaignId: campaign.id,
             extractionType,
             enrichment: enrichOptions,
-            action_queue_id: null, // Placeholder initially
+            action_queue_id: actionQueueId,
           },
           status: 'pending'
         }])
-        .select()
-        .single()
 
       if (queueError) throw queueError
-
-      // Update the payload with the actual action_queue_id
-      const { error: updatePayloadError } = await supabase
-        .from('action_queue')
-        .update({
-          payload: {
-            url: url,
-            campaignId: campaign.id,
-            extractionType,
-            enrichment: enrichOptions,
-            action_queue_id: queuedAction.id, // Now set the actual ID
-          },
-        })
-        .eq('id', queuedAction.id)
-        .eq('workspace_id', workspaceId) // Add workspace_id for RLS
-
-      if (updatePayloadError) throw updatePayloadError
 
       toast.success('Extraction started! Check the extension for progress.')
       onOpenChange(false)

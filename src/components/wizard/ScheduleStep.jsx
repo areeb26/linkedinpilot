@@ -506,6 +506,10 @@ export function ScheduleStep() {
   }
 
   const handleSaveDraft = async () => {
+    if (!campaignData.name?.trim()) {
+      toast.error('Please enter a campaign name')
+      return
+    }
     try {
       console.log('[handleSaveDraft] isNew:', isNew, 'leads count:', campaignData.leads?.length)
       const campaign = await saveCampaign('draft')
@@ -522,6 +526,10 @@ export function ScheduleStep() {
   }
 
   const handleLaunch = async () => {
+    if (!campaignData.name?.trim()) {
+      toast.error('Please enter a campaign name')
+      return
+    }
     try {
       console.log('[handleLaunch] isNew:', isNew, 'leads count:', campaignData.leads?.length)
       const campaign = await saveCampaign('draft')
@@ -530,7 +538,7 @@ export function ScheduleStep() {
       // Upload leads if there are any in the wizard context (regardless of isNew status)
       if (campaignData.leads && campaignData.leads.length > 0) {
         console.log('[handleLaunch] Uploading leads:', campaignData.leads.length, 'to campaign:', campaign.id)
-        toast.loading('Fetching LinkedIn profile data...', { id: 'enrichment' })
+        toast.loading(`Uploading ${campaignData.leads.length} leads and fetching LinkedIn profiles...`, { id: 'enrichment' })
         await uploadLeads.mutateAsync({ campaignId: campaign.id, leads: campaignData.leads })
         toast.dismiss('enrichment')
         console.log('[handleLaunch] Leads uploaded and enriched successfully')
@@ -675,9 +683,15 @@ export function ScheduleStep() {
       <Card className="p-6 bg-muted/30">
         <h3 className="font-semibold mb-4">Campaign Summary</h3>
         <div className="grid grid-cols-2 gap-4 text-sm">
-          <div>
-            <span className="text-muted-foreground">Campaign Name:</span>
-            <p className="font-medium">{campaignData.name || 'Untitled Campaign'}</p>
+          <div className="col-span-2 space-y-2">
+            <Label htmlFor="campaign-name">Campaign Name <span className="text-destructive">*</span></Label>
+            <Input
+              id="campaign-name"
+              value={campaignData.name || ''}
+              onChange={(e) => updateCampaignData({ name: e.target.value })}
+              placeholder="e.g. Q2 Outreach — Marketing Managers"
+              className="h-10"
+            />
           </div>
           <div>
             <span className="text-muted-foreground">Leads:</span>

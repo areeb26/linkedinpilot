@@ -97,26 +97,53 @@ def check_rate_limits(
         - reason (str): Reason if not allowed
     """
     try:
-        result = supabase.rpc(
-            "check_rate_limits",
-            {
-                "p_linkedin_account_id": linkedin_account_id,
-                "p_action_type": action_type,
-                "p_daily_limit": daily_limit,
-                "p_weekly_limit": weekly_limit
+        # First, get the account to check its limits and counters
+        account_response = supabase.table('linkedin_accounts').select(
+            'account_type, daily_connection_limit, daily_message_limit, '
+            'weekly_connection_limit, weekly_message_limit, '
+            'today_connections, today_messages, '
+            'this_week_connections, this_week_messages, '
+            'week_reset_at'
+        ).eq('id', linkedin_account_id).single().execute()
+        
+        if not account_response.data:
+            logger.warning(f"Account {linkedin_account_id} not found")
+            return {
+                "allowed": False,
+                "daily_count": 0,
+                "weekly_count": 0,
+                "reason": "account_not_found"
             }
-        ).execute()
         
-        data = result.data or {}
+        account = account_response.data
         
-        # Handle NULL values from database
-        daily_count = data.get("daily_count") or 0
-        weekly_count = data.get("weekly_count") or 0
-        allowed = data.get("allowed")
+        # Use account-specific limits (user can override defaults)
+        if action_type == 'connect':
+            daily_limit = account.get('daily_connection_limit', 15)
+            weekly_limit = account.get('weekly_connection_limit', 105)
+            daily_count = account.get('today_connections', 0)
+            weekly_count = account.get('this_week_connections', 0)
+        elif action_type == 'message':
+            daily_limit = account.get('daily_message_limit', 30)
+            weekly_limit = account.get('weekly_message_limit', 300)
+            daily_count = account.get('today_messages', 0)
+            weekly_count = account.get('this_week_messages', 0)
+        else:
+            daily_count = 0
+            weekly_count = 0
         
-        # If allowed is None, calculate it manually
-        if allowed is None:
-            allowed = daily_count < daily_limit and weekly_count < weekly_limit
+        # Check if limits would be exceeded
+        daily_exceeded = daily_count >= daily_limit
+        weekly_exceeded = weekly_count >= weekly_limit
+        
+        allowed = not (daily_exceeded or weekly_exceeded)
+        
+        # Determine reason if not allowed
+        reason = "ok"
+        if daily_exceeded:
+            reason = "daily_limit_reached"
+        elif weekly_exceeded:
+            reason = "weekly_limit_reached"
         
         return {
             "allowed": allowed,
@@ -124,7 +151,8 @@ def check_rate_limits(
             "weekly_count": weekly_count,
             "daily_limit": daily_limit,
             "weekly_limit": weekly_limit,
-            "reason": data.get("reason", "ok" if allowed else "limit_reached")
+            "account_type": account.get('account_type', 'free'),
+            "reason": reason
         }
     
     except Exception as e:

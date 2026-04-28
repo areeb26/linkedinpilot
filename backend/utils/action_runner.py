@@ -9,7 +9,7 @@ Improvements:
 """
 import asyncio
 import random
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import httpx
@@ -28,7 +28,6 @@ from utils.rate_limiter import (
     calculate_retry_time,
     should_retry_error,
     get_rate_limit_info,
-    calculate_next_action_time
 )
 
 
@@ -108,7 +107,7 @@ async def run_action_with_rate_limiting(
                 f"Action {action['id']} ({action['action_type']}) skipped "
                 f"(conditions not met) — counter not incremented."
             )
-            await _schedule_next_action(supabase, action, campaign)
+            await _schedule_next_action(supabase, action)
 
         elif result:
             # Increment counters after successful execution
@@ -120,7 +119,7 @@ async def run_action_with_rate_limiting(
             )
             
             # Schedule next action in sequence if applicable
-            await _schedule_next_action(supabase, action, campaign)
+            await _schedule_next_action(supabase, action)
 
 
 async def _check_rate_limits_before_action(
@@ -197,7 +196,7 @@ async def _handle_rate_limit_exceeded(
     # Update action to pending with new schedule
     supabase.table("action_queue").update({
         "status": "pending",
-        "scheduled_for": retry_time.isoformat(),
+        "scheduled_at": retry_time.isoformat(),
         "retry_reason": reason,
         "error_message": f"Rate limit exceeded: {reason}"
     }).eq("id", action["id"]).execute()
@@ -348,6 +347,76 @@ async def _execute_with_retries(
                 )
                 return True
             
+            # Handle 422 "cannot_resend_yet" — LinkedIn temporary cooldown, retry next day
+            if status == 422 and "cannot_resend_yet" in body_text:
+                retry_time = datetime.now(timezone.utc) + timedelta(hours=24)
+                logger.info(
+                    f"Action {action['id']} cannot_resend_yet (LinkedIn cooldown), "
+                    f"rescheduling to {retry_time.isoformat()}"
+                )
+                supabase.table("action_queue").update({
+                    "status": "pending",
+                    "scheduled_at": retry_time.isoformat(),
+                    "retry_reason": "cannot_resend_yet",
+                    "error_message": "LinkedIn cooldown: cannot resend invitation yet. Rescheduled for tomorrow."
+                }).eq("id", action["id"]).execute()
+                return False
+            
+            # Handle 422 "cannot_resend_within_24hrs" — same as cannot_resend_yet
+            if status == 422 and "cannot_resend_within_24hrs" in body_text:
+                retry_time = datetime.now(timezone.utc) + timedelta(hours=25)
+                logger.info(
+                    f"Action {action['id']} cannot_resend_within_24hrs, "
+                    f"rescheduling to {retry_time.isoformat()}"
+                )
+                supabase.table("action_queue").update({
+                    "status": "pending",
+                    "scheduled_at": retry_time.isoformat(),
+                    "retry_reason": "cannot_resend_within_24hrs",
+                    "error_message": "LinkedIn: cannot resend within 24hrs. Rescheduled."
+                }).eq("id", action["id"]).execute()
+                return False
+
+            # Handle 422 "limit_exceeded" — LinkedIn daily/weekly limit, retry tomorrow
+            if status == 422 and "limit_exceeded" in body_text:
+                retry_time = datetime.now(timezone.utc) + timedelta(hours=24)
+                logger.info(
+                    f"Action {action['id']} limit_exceeded, "
+                    f"rescheduling to {retry_time.isoformat()}"
+                )
+                supabase.table("action_queue").update({
+                    "status": "pending",
+                    "scheduled_at": retry_time.isoformat(),
+                    "retry_reason": "limit_exceeded",
+                    "error_message": "LinkedIn limit exceeded. Rescheduled for tomorrow."
+                }).eq("id", action["id"]).execute()
+                return False
+
+            # Handle 422 "already_connected" — lead is already a connection, treat as success
+            if status == 422 and "already_connected" in body_text:
+                logger.info(f"Action {action['id']} lead already connected, marking done.")
+                supabase.table("action_queue").update({
+                    "status": "done",
+                    "executed_at": datetime.now(timezone.utc).isoformat(),
+                    "result": {"message": "Already connected"},
+                    "error_message": None,
+                }).eq("id", action["id"]).execute()
+                if action["action_type"] == "connect" and action.get("lead_id"):
+                    supabase.table("leads").update({
+                        "connection_status": "connected"
+                    }).eq("id", action["lead_id"]).execute()
+                return True
+
+            # Handle 422 terminal errors — invalid/blocked recipient, can't be retried
+            terminal_422_types = [
+                "invalid_recipient", "blocked_recipient", "user_unreachable",
+                "cannot_invite_attendee", "invalid_account"
+            ]
+            if status == 422 and any(t in body_text for t in terminal_422_types):
+                logger.error(f"Action {action['id']} terminal 422: {body_text[:200]}")
+                await _mark_failed(supabase, action["id"], f"HTTP 422: {body_text[:200]}", is_terminal=True)
+                return False
+            
             # Check if retryable
             if not should_retry_error(e, status):
                 await _mark_failed(
@@ -403,10 +472,7 @@ async def _handle_api_rate_limit(
     })
     
     retry_after_seconds = rate_info["retry_after"]
-    retry_time = datetime.now(timezone.utc)
-    retry_time = retry_time.replace(
-        second=retry_time.second + retry_after_seconds
-    )
+    retry_time = datetime.now(timezone.utc) + timedelta(seconds=retry_after_seconds)
     
     logger.info(
         f"API rate limit (429) for action {action['id']}, "
@@ -416,7 +482,7 @@ async def _handle_api_rate_limit(
     
     supabase.table("action_queue").update({
         "status": "pending",
-        "scheduled_for": retry_time.isoformat(),
+        "scheduled_at": retry_time.isoformat(),
         "retry_reason": "api_rate_limit_429",
         "error_message": f"API rate limited, retry after {retry_after_seconds}s"
     }).eq("id", action["id"]).execute()
@@ -444,12 +510,13 @@ async def _execute_action(
     if action.get("lead_id"):
         try:
             supabase = get_supabase()
-            lead_response = supabase.table("leads").select("*").eq("id", action["lead_id"]).single().execute()
+            lead_response = supabase.table("leads").select(
+                "id, first_name, last_name, full_name, company, title, headline, location, linkedin_member_id"
+            ).eq("id", action["lead_id"]).single().execute()
             if lead_response.data:
                 lead_data = lead_response.data
-                # Log if lead is missing name data
-                if not lead_data.get("first_name"):
-                    logger.warning(f"Lead {action['lead_id']} has no first_name for template replacement")
+                if not lead_data.get("first_name") and not lead_data.get("full_name"):
+                    logger.warning(f"Lead {action['lead_id']} has no name data for template replacement")
         except Exception as e:
             logger.warning(f"Failed to fetch lead data for template replacement: {e}")
     
@@ -481,6 +548,15 @@ async def _execute_action(
         # If first_name is empty but full_name exists, extract it
         if not first_name and full_name:
             first_name = full_name.split(" ")[0]
+        
+        # If still empty, use "there" as a safe fallback so messages don't
+        # go out with literal {{first_name}} in them
+        if not first_name:
+            logger.warning(
+                f"Lead {action.get('lead_id')} has no first_name — "
+                f"using 'there' as fallback for {{{{first_name}}}}"
+            )
+            first_name = "there"
         
         replacements = {
             "{{first_name}}": first_name,
@@ -675,63 +751,58 @@ async def _mark_failed(
 async def _schedule_next_action(
     supabase,
     completed_action: dict,
-    campaign: Optional[dict]
 ):
     """
-    Schedule the next action in the campaign sequence.
-    
-    Uses natural timing with jitter.
+    Advance the enrollment's current_step counter and mark it completed when
+    all its action_queue rows are finished.
+
+    NOTE: process-campaign/index.ts pre-queues ALL steps for every enrollment
+    at launch time (with correct scheduled_at and _conditions).  This function
+    must NOT insert new queue rows — doing so would duplicate every step.
+    Its only jobs are:
+      1. Increment current_step on the enrollment.
+      2. Check whether every action_queue row for this enrollment is terminal
+         (done / skipped / failed).  If so, mark the enrollment completed.
     """
-    if not campaign or not completed_action.get("campaign_enrollment_id"):
+    if not completed_action.get("campaign_enrollment_id"):
         return
-    
+
     enrollment_id = completed_action["campaign_enrollment_id"]
-    
+
     try:
-        # Get enrollment
-        enrollment = supabase.table("campaign_enrollments").select("*").eq(
-            "id", enrollment_id
-        ).single().execute().data
-        
+        # Bump current_step
+        enrollment = supabase.table("campaign_enrollments").select(
+            "id, current_step, workspace_id, campaign_id"
+        ).eq("id", enrollment_id).single().execute().data
+
         if not enrollment:
             return
-        
-        # Get sequence from campaign
-        sequence = campaign.get("sequence_json", {})
-        nodes = sequence.get("nodes", [])
-        
-        current_step = enrollment.get("current_step", 0)
-        next_step = current_step + 1
-        
-        if next_step >= len(nodes):
-            # Sequence complete
-            supabase.table("campaign_enrollments").update({
-                "status": "completed",
-                "completed_at": datetime.now(timezone.utc).isoformat()
-            }).eq("id", enrollment_id).execute()
-            return
-        
-        # Get next node
-        next_node = nodes[next_step]
-        delay_hours = next_node.get("data", {}).get("delay", 24)
-        
-        # Calculate next action time with jitter
-        next_time = calculate_next_action_time(
-            datetime.now(timezone.utc),
-            delay_hours=delay_hours,
-            jitter_minutes=30
-        )
-        
-        # Update enrollment
+
+        next_step = enrollment.get("current_step", 0) + 1
         supabase.table("campaign_enrollments").update({
             "current_step": next_step,
-            "next_action_at": next_time.isoformat()
         }).eq("id", enrollment_id).execute()
-        
-        logger.info(
-            f"Scheduled next action for enrollment {enrollment_id} "
-            f"at {next_time.isoformat()} (step {next_step}, delay {delay_hours}h)"
-        )
-    
+
+        # Check if all queue rows for this enrollment are terminal
+        remaining = supabase.table("action_queue").select("id").eq(
+            "campaign_enrollment_id", enrollment_id
+        ).in_("status", ["pending", "processing"]).limit(1).execute()
+
+        if not remaining.data:
+            # Every step is done / skipped / failed — enrollment is complete
+            supabase.table("campaign_enrollments").update({
+                "status": "completed",
+                "completed_at": datetime.now(timezone.utc).isoformat(),
+            }).eq("id", enrollment_id).execute()
+            logger.info(
+                f"Enrollment {enrollment_id} completed "
+                f"(all {next_step} steps finished)."
+            )
+        else:
+            logger.info(
+                f"Enrollment {enrollment_id} advanced to step {next_step}; "
+                f"next pending action will execute at its scheduled_at time."
+            )
+
     except Exception as e:
-        logger.error(f"Failed to schedule next action: {e}")
+        logger.error(f"Failed to advance enrollment {enrollment_id}: {e}")

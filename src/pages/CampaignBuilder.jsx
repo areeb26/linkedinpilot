@@ -1,5 +1,5 @@
 import React from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { ChevronLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -18,8 +18,10 @@ import { ScheduleStep } from '@/components/wizard/ScheduleStep'
 // Wrapper to provide context
 export default function CampaignBuilder() {
   const { id } = useParams()
+  const location = useLocation()
+  const initialName = location.state?.campaignName || ''
   return (
-    <WizardProvider campaignId={id}>
+    <WizardProvider campaignId={id} initialName={initialName}>
       <CampaignBuilderContent />
     </WizardProvider>
   )
@@ -28,7 +30,7 @@ export default function CampaignBuilder() {
 // Main content with access to wizard state
 function CampaignBuilderContent() {
   const navigate = useNavigate()
-  const { currentStep: _currentStep, currentStepName, campaignData, isLoading, prevStep, isFirstStep, isDirty, isSaving } = useWizard()
+  const { currentStep: _currentStep, currentStepName, campaignData, isLoading, prevStep, isFirstStep, isDirty, isSaving, sequenceView, setSequenceView, updateCampaignData } = useWizard()
 
   if (isLoading) {
     return (
@@ -78,6 +80,10 @@ function CampaignBuilderContent() {
         return <LeadSourceStep />
       }
       if (campaignData.leadSource === 'existing') {
+        // If existing campaign has 0 leads, let them choose a source
+        if (campaignData.leads.length === 0) {
+          return <LeadSourceStep />
+        }
         return <LeadReview />
       }
       if (campaignData.leadSource === 'csv') {
@@ -141,7 +147,18 @@ function CampaignBuilderContent() {
           <Button 
             variant="ghost" 
             size="sm" 
-            onClick={() => isFirstStep ? navigate('/campaigns') : prevStep()}
+            onClick={() => {
+              if (currentStepName === 'sequences' && (sequenceView === 'builder' || sequenceView === 'templates')) {
+                setSequenceView('select')
+              } else if (currentStepName === 'leads' && campaignData.leadSource && campaignData.leads.length === 0) {
+                // Inside a lead source sub-step (database/extractor/csv) with no leads yet → back to source picker
+                updateCampaignData({ leadSource: null })
+              } else if (isFirstStep) {
+                navigate('/campaigns')
+              } else {
+                prevStep()
+              }
+            }}
           >
             <ChevronLeft className="w-4 h-4 mr-2" /> Back
           </Button>

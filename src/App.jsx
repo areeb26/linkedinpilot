@@ -80,7 +80,47 @@ export default function App() {
           setWorkspace(first.workspace_id, first.workspaces.name)
           console.log('[App] Set workspace:', first.workspaces.name)
         } else {
-          console.warn('[App] No workspaces found for user')
+          // No workspace found — auto-create one (happens for Google OAuth new users)
+          console.log('[App] No workspaces found, auto-creating workspace for new user...')
+          try {
+            const workspaceId = crypto.randomUUID()
+            const displayName = user.user_metadata?.full_name
+              || user.user_metadata?.name
+              || user.email?.split('@')[0]
+              || 'My'
+            const workspaceName = `${displayName}'s Workspace`
+            const slug = `${displayName.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${Math.floor(Math.random() * 1000)}`
+
+            const { error: wsError } = await supabase.from('workspaces').insert({
+              id: workspaceId,
+              name: workspaceName,
+              slug,
+              owner_id: user.id,
+            })
+
+            if (wsError) {
+              console.error('[App] Failed to create workspace:', wsError)
+              return
+            }
+
+            const { error: memberError } = await supabase.from('team_members').insert({
+              workspace_id: workspaceId,
+              user_id: user.id,
+              role: 'owner',
+              accepted_at: new Date().toISOString(),
+            })
+
+            if (memberError) {
+              console.error('[App] Failed to add team member:', memberError)
+              return
+            }
+
+            setWorkspace(workspaceId, workspaceName)
+            setWorkspaces([{ id: workspaceId, name: workspaceName }])
+            console.log('[App] Auto-created workspace:', workspaceName)
+          } catch (err) {
+            console.error('[App] Failed to auto-create workspace:', err)
+          }
         }
       } catch (err) {
         console.error('[App] Failed to load workspace:', err)

@@ -2,6 +2,7 @@ import React, { useState, useCallback } from 'react'
 import { useWizard } from './WizardContext'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Upload, FileText, Check, X, Loader2, AlertCircle } from 'lucide-react'
 import Papa from 'papaparse'
 import { cn } from '@/lib/utils'
@@ -27,12 +28,20 @@ const FIELD_OPTIONS = [
 ]
 
 export function CSVUpload() {
-  const { campaignData: _campaignData, updateCampaignData, nextStep } = useWizard()
+  const { campaignData: _campaignData, updateCampaignData } = useWizard()
   const [isDragging, setIsDragging] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [parseError, setParseError] = useState(null)
-  const [parsedData, setParsedData] = useState(null)
-  const [columnMapping, setColumnMapping] = useState({})
+  // Restore previously parsed data if user came back from LeadReview
+  const [parsedData, setParsedData] = useState(_campaignData._csvParsedData || null)
+  const [columnMapping, setColumnMapping] = useState(_campaignData.columnMapping || {})
+  const [selectedRows, setSelectedRows] = useState(
+    _campaignData._csvSelectedRows
+      ? new Set(_campaignData._csvSelectedRows)
+      : _campaignData._csvParsedData
+        ? new Set(_campaignData._csvParsedData.allData.map((_, i) => i))
+        : new Set()
+  )
 
   const handleFile = useCallback((file) => {
     setParseError(null)
@@ -70,6 +79,9 @@ export function CSVUpload() {
           preview: results.data.slice(0, 5), // Preview first 5 rows
           allData: results.data // Store all data
         })
+        
+        // Select all rows by default
+        setSelectedRows(new Set(results.data.map((_, i) => i)))
         
         // Auto-detect column mappings
         const autoMapping = {}
@@ -124,24 +136,52 @@ export function CSVUpload() {
     setColumnMapping(prev => ({ ...prev, [column]: value }))
   }
 
-  const handleConfirm = () => {
-    // Transform ALL parsed data into leads using mapping
-    const leads = parsedData.allData.map((row, index) => {
-      const lead = { id: `lead-${index}` }
-      Object.entries(columnMapping).forEach(([csvCol, field]) => {
-        if (field !== 'doNotImport') {
-          lead[field] = row[csvCol]
-        }
-      })
-      return lead
+  const toggleRow = (idx) => {
+    setSelectedRows(prev => {
+      const next = new Set(prev)
+      if (next.has(idx)) next.delete(idx)
+      else next.add(idx)
+      return next
     })
+  }
 
+  const toggleAll = () => {
+    if (selectedRows.size === parsedData.allData.length) {
+      setSelectedRows(new Set())
+    } else {
+      setSelectedRows(new Set(parsedData.allData.map((_, i) => i)))
+    }
+  }
+
+  const handleConfirm = () => {
+    // Only include selected rows
+    const leads = parsedData.allData
+      .filter((_, index) => selectedRows.has(index))
+      .map((row, index) => {
+        const lead = { id: `lead-${index}` }
+        Object.entries(columnMapping).forEach(([csvCol, field]) => {
+          if (field !== 'doNotImport') {
+            lead[field] = row[csvCol]
+          }
+        })
+        return lead
+      })
+
+    if (leads.length === 0) {
+      toast.error('Please select at least one lead')
+      return
+    }
+
+    // Don't call nextStep() — updating leads with length > 0 will
+    // automatically render LeadReview (CampaignBuilder checks leads.length)
+    // Also store parsedData so Back from LeadReview can restore it
     updateCampaignData({
       leads,
       columnMapping,
-      csvFileName: parsedData.fileName
+      csvFileName: parsedData.fileName,
+      _csvParsedData: parsedData,
+      _csvSelectedRows: Array.from(selectedRows),
     })
-    nextStep()
   }
 
   const hasRequiredMapping = Object.values(columnMapping).includes('linkedInUrl')
@@ -271,12 +311,29 @@ export function CSVUpload() {
 
         {/* Preview All Leads */}
         <div className="space-y-2">
-          <h4 className="text-sm font-medium">Preview Leads ({parsedData.rowCount} total)</h4>
+          <div className="flex items-center justify-between">
+            <h4 className="text-sm font-medium">
+              Preview Leads ({selectedRows.size} of {parsedData.rowCount} selected)
+            </h4>
+            <button
+              onClick={toggleAll}
+              className="text-xs text-primary hover:underline"
+            >
+              {selectedRows.size === parsedData.allData.length ? 'Deselect All' : 'Select All'}
+            </button>
+          </div>
           <Card className="overflow-hidden">
             <div className="max-h-96 overflow-y-auto">
               <table className="w-full text-sm">
                 <thead className="bg-muted/50 border-b sticky top-0">
                   <tr>
+                    <th className="p-3 w-10">
+                      <Checkbox
+                        checked={selectedRows.size === parsedData.allData.length}
+                        onCheckedChange={toggleAll}
+                        aria-label="Select all"
+                      />
+                    </th>
                     {parsedData.columns.map((col) => (
                       <th key={col} className="text-left p-3 font-medium text-xs">
                         {col}
@@ -286,7 +343,23 @@ export function CSVUpload() {
                 </thead>
                 <tbody>
                   {parsedData.allData.map((row, idx) => (
-                    <tr key={idx} className="border-b last:border-b-0 hover:bg-muted/30">
+                    <tr
+                      key={idx}
+                      onClick={() => toggleRow(idx)}
+                      className={cn(
+                        'border-b last:border-b-0 cursor-pointer transition-colors',
+                        selectedRows.has(idx)
+                          ? 'bg-primary/5 hover:bg-primary/10'
+                          : 'opacity-50 hover:opacity-70 hover:bg-muted/30'
+                      )}
+                    >
+                      <td className="p-3" onClick={(e) => e.stopPropagation()}>
+                        <Checkbox
+                          checked={selectedRows.has(idx)}
+                          onCheckedChange={() => toggleRow(idx)}
+                          aria-label={`Select row ${idx + 1}`}
+                        />
+                      </td>
                       {parsedData.columns.map((col) => (
                         <td key={col} className="p-3 text-muted-foreground truncate max-w-xs">
                           {row[col] || '-'}
@@ -312,8 +385,8 @@ export function CSVUpload() {
               </span>
             )}
           </p>
-          <Button onClick={handleConfirm} disabled={!hasRequiredMapping}>
-            Continue
+          <Button onClick={handleConfirm} disabled={!hasRequiredMapping || selectedRows.size === 0}>
+            Continue ({selectedRows.size} leads)
           </Button>
         </div>
       </div>
