@@ -183,7 +183,7 @@ export function LeadExtractorStep() {
       )}
 
       <div className="flex items-center justify-between pt-4 border-t">
-        <Button variant="outline" onClick={prevStep}>
+        <Button variant="outline" onClick={() => updateCampaignData({ leadSource: null })}>
           <ChevronLeft className="w-4 h-4 mr-2" /> Back
         </Button>
         <Button 

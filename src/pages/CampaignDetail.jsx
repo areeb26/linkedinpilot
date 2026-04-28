@@ -144,7 +144,27 @@ export default function CampaignDetail() {
     opportunities: 0
   }
 
-  const getStatusBadge = (status) => {
+  // Check if end date has passed
+  const scheduleSettings = campaign?.settings?.schedule || {}
+  const endDate = scheduleSettings.endDate
+  let isEndDatePassed = false
+  
+  if (endDate) {
+    const endDateTime = new Date(endDate)
+    const now = new Date()
+    isEndDatePassed = now > endDateTime
+  }
+
+  const getStatusBadge = (status, isEndDatePassed) => {
+    // If paused and end date passed, show "Date Passed" badge
+    if (status === 'paused' && isEndDatePassed) {
+      return (
+        <span className="px-2 py-0.5 rounded text-xs font-medium bg-destructive/10 text-destructive border border-destructive/25">
+          Date Passed
+        </span>
+      )
+    }
+    
     switch (status) {
       case 'active': 
         return (
@@ -201,7 +221,7 @@ export default function CampaignDetail() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <h1 className="font-display text-xl font-semibold text-foreground">{campaign.name}</h1>
-            {getStatusBadge(campaign.status)}
+            {getStatusBadge(campaign.status, isEndDatePassed)}
           </div>
           <div className="flex items-center gap-2">
             <Button 
@@ -263,7 +283,7 @@ export default function CampaignDetail() {
 function AnalyticsTab({ stats }) {
   const metrics = [
     { label: 'Connections Sent', value: stats?.connections_sent || 0 },
-    { label: 'Connections Allocated', value: stats?.connections_accepted || 0 },
+    { label: 'Connections Accepted', value: stats?.connections_accepted || 0 },
     { label: 'Messages Sent', value: stats?.messages_sent || 0 },
     { label: 'Reply Received', value: stats?.replies_received || 0 },
     { label: 'Opportunities', value: stats?.opportunities || 0 },

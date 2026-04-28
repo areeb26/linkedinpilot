@@ -330,24 +330,27 @@ const SYSTEM_TEMPLATES = [
 ]
 
 export function SequencesStep() {
-  const { campaignData, updateCampaignData, nextStep, prevStep } = useWizard()
-  const [view, setView] = useState('loading')
+  const { campaignData, updateCampaignData, nextStep, prevStep, sequenceView, setSequenceView } = useWizard()
   const [nodes, setNodes] = useState([])
   const [edges, setEdges] = useState([])
   const [selectedNode, setSelectedNode] = useState(null)
   const initialized = useRef(false)
   const [confirmTemplate, setConfirmTemplate] = useState(null)
 
-  // Initialize view based on campaign data once it's loaded
+  const viewSeeded = useRef(false)
+
+  // Initialize view based on campaign data once — never re-run after that
   useEffect(() => {
-    if (view !== 'loading') return
+    if (viewSeeded.current) return
+    viewSeeded.current = true
     const hasExistingSequence = (campaignData.sequence?.nodes?.length ?? 0) > 0
-    setView(hasExistingSequence ? 'builder' : 'select')
-  }, [campaignData.sequence, view])
+    setSequenceView(hasExistingSequence ? 'builder' : 'select')
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Initialize nodes/edges when entering builder view
   useEffect(() => {
-    if (view !== 'builder' || initialized.current) return
+    if (sequenceView !== 'builder' || initialized.current) return
     initialized.current = true
     const withDelete = (campaignData.sequence?.nodes || []).map(n => ({
       ...n,
@@ -356,7 +359,7 @@ export function SequencesStep() {
     setNodes(withDelete)
     setEdges(campaignData.sequence?.edges || [])
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [view])
+  }, [sequenceView])
 
   const onNodesChange = useCallback((changes) => setNodes((nds) => applyNodeChanges(changes, nds)), [])
   const onEdgesChange = useCallback((changes) => setEdges((eds) => applyEdgeChanges(changes, eds)), [])
@@ -422,7 +425,7 @@ export function SequencesStep() {
     setNodes(withDelete)
     setEdges(template.edges)
     initialized.current = true
-    setView('builder')
+    setSequenceView('builder')
     setSelectedNode(null)
     setConfirmTemplate(null)
     toast.success('Template loaded')
@@ -437,7 +440,7 @@ export function SequencesStep() {
     setNodes(SCRATCH_NODES.nodes)
     setEdges(SCRATCH_NODES.edges)
     initialized.current = true
-    setView('builder')
+    setSequenceView('builder')
   }
 
   const autoLayout = () => {
@@ -464,7 +467,7 @@ export function SequencesStep() {
     setNodes(nds => nds.map(n => ({ ...n, position: newPos[n.id] || n.position })))
   }
 
-  if (view === 'loading') {
+  if (sequenceView === 'loading') {
     return (
       <div className="flex flex-col items-center justify-center h-[calc(100vh-300px)] gap-4">
         <Loader className="w-8 h-8 text-primary animate-spin" />
@@ -473,7 +476,7 @@ export function SequencesStep() {
     )
   }
 
-  if (view === 'select') {
+  if (sequenceView === 'select') {
     return (
       <div className="flex flex-col items-center justify-center h-[calc(100vh-300px)] gap-8">
         <div className="text-center space-y-2">
@@ -502,7 +505,7 @@ export function SequencesStep() {
           </button>
 
           <button
-            onClick={() => setView('templates')}
+            onClick={() => setSequenceView('templates')}
             className="group relative flex flex-col gap-4 p-8 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface-strong)] hover:border-violet-500/50 hover:bg-[var(--color-input)] transition-all text-left"
           >
             <div className="w-12 h-12 rounded-xl bg-violet-500/10 flex items-center justify-center group-hover:bg-violet-500/20 transition-colors">
@@ -523,20 +526,15 @@ export function SequencesStep() {
           </button>
         </div>
 
-        <div className="flex justify-start w-full max-w-2xl">
-          <Button variant="outline" onClick={prevStep}>
-            <ChevronLeft className="w-4 h-4 mr-2" /> Back
-          </Button>
-        </div>
       </div>
     )
   }
 
-  if (view === 'templates') {
+  if (sequenceView === 'templates') {
     return (
       <div className="flex flex-col gap-6 h-[calc(100vh-300px)] overflow-y-auto">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" onClick={() => setView('select')}>
+          <Button variant="ghost" size="sm" onClick={() => setSequenceView('select')}>
             <ChevronLeft className="w-4 h-4 mr-1" /> Back
           </Button>
           <div>
@@ -604,7 +602,7 @@ export function SequencesStep() {
               </Button>
               <Button variant="ghost" className="w-full text-xs text-muted-foreground" onClick={() => {
                 if (nodes.length > 1) { setConfirmTemplate('browse'); return }
-                initialized.current = false; setView('templates')
+                initialized.current = false; setSequenceView('templates')
               }}>
                 Browse Templates
               </Button>
@@ -708,6 +706,31 @@ export function SequencesStep() {
 
                     {['message', 'connect', 'inmail'].includes(selectedNode.data.actionType) && (
                       <div className="space-y-2">
+                        <Label className="text-xs uppercase font-bold text-muted-foreground">Message Template</Label>
+                        <Select
+                          value=""
+                          onValueChange={(v) => updateNodeData(selectedNode.id, { message: v })}
+                        >
+                          <SelectTrigger className="text-xs">
+                            <SelectValue placeholder="Insert a template…" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {selectedNode.data.actionType === 'connect' && <>
+                              <SelectItem value="Hi {{first_name}}, I'd love to connect!">Simple connect</SelectItem>
+                              <SelectItem value="Hi {{first_name}}, I came across your profile and would love to connect — I work in {{value_prop}} and think we could have a great conversation.">Value-prop connect</SelectItem>
+                              <SelectItem value="Hi {{first_name}}, I noticed your work at {{company}} and wanted to reach out. Would love to connect!">Company mention</SelectItem>
+                            </>}
+                            {selectedNode.data.actionType === 'message' && <>
+                              <SelectItem value="Hi {{first_name}}, thanks for connecting! I wanted to reach out about {{value_prop}}. Would love to chat — does that sound interesting?">First touch</SelectItem>
+                              <SelectItem value="Just following up, {{first_name}} — did you get a chance to look at my last message? Happy to answer any questions.">Follow-up</SelectItem>
+                              <SelectItem value="Last one from me, {{first_name}} — let me know if there's a better time to connect. Either way, best of luck with everything at {{company}}!">Final follow-up</SelectItem>
+                            </>}
+                            {selectedNode.data.actionType === 'inmail' && <>
+                              <SelectItem value="Hi {{first_name}}, I noticed your work at {{company}} and wanted to reach out directly. I think there's a great opportunity to discuss {{value_prop}}. Would you be open to a quick chat?">InMail outreach</SelectItem>
+                              <SelectItem value="Following up, {{first_name}} — would love to connect and share some ideas that might be relevant to your work at {{company}}.">InMail follow-up</SelectItem>
+                            </>}
+                          </SelectContent>
+                        </Select>
                         <Label className="text-xs uppercase font-bold text-muted-foreground">Message Body</Label>
                         <textarea
                           value={selectedNode.data.message || ''}
@@ -774,7 +797,7 @@ export function SequencesStep() {
           <DialogFooter className="flex gap-2 mt-4">
             <Button variant="outline" onClick={() => setConfirmTemplate(null)}>Cancel</Button>
             <Button variant="destructive" onClick={() => {
-              if (confirmTemplate === 'browse') { setConfirmTemplate(null); initialized.current = false; setView('templates') }
+              if (confirmTemplate === 'browse') { setConfirmTemplate(null); initialized.current = false; setSequenceView('templates') }
               else applyTemplate(confirmTemplate)
             }}>Replace</Button>
           </DialogFooter>
@@ -782,7 +805,11 @@ export function SequencesStep() {
       </Dialog>
 
       <div className="flex items-center justify-between pt-4 border-t">
-        <Button variant="outline" onClick={prevStep}>
+        <Button variant="outline" onClick={() => {
+          // Go back to sequence selection screen, not previous wizard step
+          setSequenceView('select')
+          initialized.current = false
+        }}>
           <ChevronLeft className="w-4 h-4 mr-2" /> Back
         </Button>
         <Button onClick={handleContinue}>

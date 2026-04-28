@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
-import { useCampaign, useCreateCampaign, useUpdateCampaign } from '@/hooks/useCampaigns'
+import { useCampaign, useCreateCampaign, useUpdateCampaign, useCampaignLeads } from '@/hooks/useCampaigns'
 import { useWorkspaceStore } from '@/store/workspaceStore'
 import { toast } from 'react-hot-toast'
 
@@ -17,6 +17,7 @@ const DEFAULT_CAMPAIGN_DATA = {
   name: '',
   leadSource: null,
   leads: [],
+  selectedLeadIds: [], // Track which leads are selected for enrollment
   columnMapping: {},
   selectedAccounts: [],
   accountLimits: {
@@ -34,16 +35,21 @@ const DEFAULT_CAMPAIGN_DATA = {
   }
 }
 
-export function WizardProvider({ children, campaignId }) {
+export function WizardProvider({ children, campaignId, initialName = '' }) {
   const [currentStep, setCurrentStep] = useState(0)
-  const [campaignData, setCampaignData] = useState(DEFAULT_CAMPAIGN_DATA)
+  const [campaignData, setCampaignData] = useState(() => ({
+    ...DEFAULT_CAMPAIGN_DATA,
+    name: initialName,
+  }))
   const [isDirty, setIsDirty] = useState(false)
   const [seeded, setSeeded] = useState(!campaignId) // new campaigns are immediately ready
   const [savedCampaignId, setSavedCampaignId] = useState(campaignId)
   const [isSaving, setIsSaving] = useState(false)
+  const [sequenceView, setSequenceView] = useState('loading') // 'loading' | 'select' | 'templates' | 'builder'
 
   const { workspaceId } = useWorkspaceStore()
   const { data: existingCampaign } = useCampaign(campaignId)
+  const { data: existingLeads } = useCampaignLeads(campaignId)
   const createCampaign = useCreateCampaign()
   const updateCampaign = useUpdateCampaign()
 
@@ -55,10 +61,30 @@ export function WizardProvider({ children, campaignId }) {
     const scheduleSettings = settings.schedule || {}
     const dailyLimits = settings.dailyLimits || {}
 
+    // Transform existing leads to match the expected format for the wizard
+    const transformedLeads = existingLeads ? existingLeads.map(lead => ({
+      id: lead.id,
+      firstName: lead.first_name,
+      lastName: lead.last_name,
+      fullName: lead.full_name,
+      headline: lead.headline,
+      company: lead.company,
+      jobTitle: lead.title, // LeadReview expects jobTitle
+      linkedInUrl: lead.profile_url, // LeadReview expects linkedInUrl
+      profileUrl: lead.profile_url,
+      avatarUrl: lead.avatar_url,
+      connectionStatus: lead.connection_status,
+      notes: lead.notes,
+      enrollmentId: lead.enrollment_id,
+      enrollmentStatus: lead.status,
+      enrolledAt: lead.enrolled_at
+    })) : []
+
     setCampaignData({
       ...DEFAULT_CAMPAIGN_DATA,
       name: existingCampaign.name || '',
       leadSource: 'existing',
+      leads: transformedLeads, // Populate with existing leads
       selectedAccounts: existingCampaign.linkedin_account_id
         ? [existingCampaign.linkedin_account_id]
         : [],
@@ -86,7 +112,7 @@ export function WizardProvider({ children, campaignId }) {
     
     setCurrentStep(initialStep)
     setSeeded(true)
-  }, [campaignId, existingCampaign, seeded])
+  }, [campaignId, existingCampaign, existingLeads, seeded])
 
   const updateCampaignData = (updates) => {
     setCampaignData(prev => ({ ...prev, ...updates }))
@@ -196,6 +222,8 @@ export function WizardProvider({ children, campaignId }) {
     isNew: !campaignId && !savedCampaignId,
     campaignId: savedCampaignId || campaignId || null,
     isLoading: !!campaignId && !seeded,
+    sequenceView,
+    setSequenceView,
   }
 
   return (

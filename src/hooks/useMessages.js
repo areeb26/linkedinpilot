@@ -192,6 +192,7 @@ export function useSendMessage() {
                   action_type: 'message',
                   linkedin_account_id,
                   lead_id,
+                  campaign_id: campaign_id || null,
                   payload: { profile_url, message: body, threadId: thread_id },
                 },
               }),

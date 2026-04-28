@@ -119,11 +119,18 @@ function handleGroupEventData(data: any) {
 
 /**
  * Strips query params, hash, and trailing slash. Returns "" if not a /in/ URL.
+ * Also rejects overlay paths (contact-info, browsemap, etc.) and UI element links.
  */
 function cleanProfileUrl(url: string): string {
   if (!url) return '';
   const cleaned = url.split('?')[0].split('#')[0].replace(/\/$/, '');
-  return cleaned.includes('/in/') ? cleaned : '';
+  if (!cleaned.includes('/in/')) return '';
+  // Reject LinkedIn overlay/sub-page URLs — these are UI elements, not profile URLs
+  if (cleaned.includes('/overlay/') || cleaned.includes('/detail/') || cleaned.includes('/recent-activity/')) return '';
+  // The slug must be the last path segment after /in/ — no further slashes allowed
+  const slug = cleaned.split('/in/')[1] || '';
+  if (slug.includes('/')) return '';
+  return cleaned;
 }
 
 /**

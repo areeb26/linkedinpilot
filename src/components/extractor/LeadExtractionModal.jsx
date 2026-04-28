@@ -9,11 +9,12 @@ import { useWorkspaceStore } from '@/store/workspaceStore'
 import { useLinkedInAccounts } from '@/hooks/useLinkedInAccounts'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'react-hot-toast'
+import { buildSearchBody, mapUnipileItem, buildActionPayload } from '@/lib/extraction-utils'
 import {
   X, ChevronLeft, ChevronRight, Puzzle, Search, Sparkles,
   Building2, MapPin, ExternalLink, Loader2, CheckCircle2,
   AlertCircle, Briefcase, SlidersHorizontal, ArrowRight,
-  Zap
+  Zap, Tag, Users
 } from 'lucide-react'
 
 const METHOD_PICK  = 'method'
@@ -28,6 +29,10 @@ function buildLinkedInSearchUrl(kw) {
 }
 
 const extConfigRef = { current: null }
+// Module-level cancellation flag — survives component unmount so the
+// pagination loop keeps running when the user closes the modal.
+// Reset to false each time a new extraction starts.
+const extractionCancelled = { current: false }
 
 export function LeadExtractionModal({ isOpen, onOpenChange }) {
   const [step, setStep] = useState(METHOD_PICK)
@@ -213,8 +218,11 @@ function ExtConfigStep({ onBack, onDone }) {
     if (isStarting) return  // prevent double-click double-submit
     setIsStarting(true)
     try {
-      // Check if a campaign with this name already exists for this workspace
-      // to prevent duplicate creation on double-click or re-render
+      // Pre-generate the action_queue UUID so the payload can reference it
+      // in the same insert — eliminates the race condition where the extension
+      // could pick up the action before the second update sets action_queue_id.
+      const actionQueueId = crypto.randomUUID()
+
       const { data: campaign, error: campErr } = await supabase
         .from('campaigns')
         .insert([{
@@ -229,25 +237,28 @@ function ExtConfigStep({ onBack, onDone }) {
         .single()
       if (campErr) throw campErr
 
+      // Build complete payload in one shot — no second update needed
+      const payload = buildActionPayload({
+        extractionType: 'search',
+        campaignId: campaign.id,
+        maxLeads,
+        actionQueueId,
+      })
+
       const { data: action, error: actErr } = await supabase
         .from('action_queue')
         .insert([{
+          id: actionQueueId,
           workspace_id: workspaceId,
           linkedin_account_id: selectedAccountId,
           campaign_id: campaign.id,
           action_type: 'scrapeLeads',
-          payload: { extractionType: 'search', campaignId: campaign.id, maxLeads },
+          payload,
           status: 'pending'
         }])
         .select()
         .single()
       if (actErr) throw actErr
-
-      // Update payload to include the action_queue_id so the extension can link leads
-      await supabase
-        .from('action_queue')
-        .update({ payload: { extractionType: 'search', campaignId: campaign.id, maxLeads, action_queue_id: action.id } })
-        .eq('id', action.id)
 
       extConfigRef.current = { actionId: action.id, campaignId: campaign.id, workspaceId, maxLeads, listName: listName.trim() }
       onDone()
@@ -738,6 +749,9 @@ function UnipileFormStep({ onBack, onResults }) {
   const [companyIds, setCompanyIds] = React.useState([])
   const [industryIds, setIndustryIds] = React.useState([])
   const [titleIds, setTitleIds] = React.useState([])
+  const [serviceIds, setServiceIds] = React.useState([])
+  // Network distance: array of 1 | 2 | 3
+  const [networkDistance, setNetworkDistance] = React.useState([])
   const [showFilters, setShowFilters] = React.useState(false)
   const [isStarting, setIsStarting] = React.useState(false)
 
@@ -753,6 +767,13 @@ function UnipileFormStep({ onBack, onResults }) {
     )
   }
 
+  // Helper to toggle a degree value in networkDistance array
+  const toggleDegree = (deg) => {
+    setNetworkDistance(prev =>
+      prev.includes(deg) ? prev.filter(d => d !== deg) : [...prev, deg]
+    )
+  }
+
   const handleStart = async () => {
     if (!listName.trim()) { toast.error('Enter a list name'); return }
     if (!selectedAccountId) { toast.error('Select a LinkedIn account'); return }
@@ -762,10 +783,12 @@ function UnipileFormStep({ onBack, onResults }) {
 
     // Build filters using IDs per Unipile spec
     const filters = {}
-    if (locationIds.length > 0)  filters.location = locationIds.map(l => Number(l.id) || l.id)
-    if (companyIds.length > 0)   filters.company  = { include: companyIds.map(c => Number(c.id) || c.id) }
-    if (industryIds.length > 0)  filters.industry = { include: industryIds.map(i => String(i.id)) }
-    if (titleIds.length > 0)     filters.title    = titleIds.map(t => t.title).join(' OR ')
+    if (locationIds.length > 0)     filters.location         = locationIds.map(l => Number(l.id) || l.id)
+    if (companyIds.length > 0)      filters.company          = { include: companyIds.map(c => Number(c.id) || c.id) }
+    if (industryIds.length > 0)     filters.industry         = { include: industryIds.map(i => String(i.id)) }
+    if (titleIds.length > 0)        filters.title            = titleIds.map(t => t.title).join(' OR ')
+    if (serviceIds.length > 0)      filters.service          = serviceIds.map(s => String(s.id))
+    if (networkDistance.length > 0) filters.network_distance = networkDistance
 
     setIsStarting(true)
     extConfigRef.current = {
@@ -948,6 +971,55 @@ function UnipileFormStep({ onBack, onResults }) {
               placeholder="Select job titles..."
             />
           </div>
+
+          {/* Service Categories — Classic only */}
+          {apiType === 'classic' && category === 'people' && (
+            <FilterDropdown
+              label="Service Category"
+              icon={Tag}
+              paramType="SERVICE"
+              accountId={unipileAccountId}
+              apiType={apiType}
+              selected={serviceIds}
+              onToggle={makeToggle(setServiceIds)}
+              placeholder="Select service categories..."
+            />
+          )}
+
+          {/* Network Distance — people searches only */}
+          {category === 'people' && (
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider flex items-center gap-1">
+                <Users className="h-3 w-3" /> Network Distance
+              </label>
+              <div className="flex gap-2">
+                {[
+                  { deg: 1, label: '1st' },
+                  { deg: 2, label: '2nd' },
+                  { deg: 3, label: '3rd+' },
+                ].map(({ deg, label }) => {
+                  const active = networkDistance.includes(deg)
+                  return (
+                    <button
+                      key={deg}
+                      type="button"
+                      onClick={() => toggleDegree(deg)}
+                      className={cn(
+                        'px-3 py-1.5 rounded-xs text-xs font-bold transition-all border',
+                        active
+                          ? 'bg-[var(--color-surface-raised)] border-[var(--color-surface-raised)] text-[var(--color-text-on-strong)]'
+                          : 'bg-[var(--color-border)] border-[var(--color-border)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-on-strong)]'
+                      )}
+                    >
+                      {label}
+                    </button>
+                  )
+                })}
+              </div>
+              <p className="text-[10px] text-[var(--color-text-secondary)]">Leave empty to include all degrees.</p>
+            </div>
+          )}
+
           <p className="text-[10px] text-[var(--color-text-secondary)]">
             Click a dropdown → type to search → check items to add. LinkedIn requires IDs, not raw text.
           </p>
@@ -1020,123 +1092,38 @@ function UnipileResultsStep({ onBack, onClose }) {
 
   const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000'
 
-  // mapItem: convert a Unipile search result item to a leads table row
-  // Field availability by tier (from Unipile docs):
-  //   Classic:        id(URN), name, member_urn, profile_url(with ?miniProfileUrn=), location, headline
-  //   Sales Nav:      id, name, first_name, last_name, public_identifier, public_profile_url,
-  //                   profile_picture_url, location, headline, current_positions[]
-  //   Recruiter:      id, headline, location, current_positions[] — name/profile_url may be null
-  const mapItem = (item, actionId) => {
-    // Build a valid, clickable profile_url.
-    // Priority order:
-    // 1. public_profile_url (Sales Nav) - most reliable
-    // 2. public_identifier (Sales Nav) - build clean URL
-    // 3. profile_url with valid slug (Classic) - extract slug
-    // 4. member_urn (Classic/Recruiter) - use member ID format
-    // 5. provider_id - use as member ID
-    let profileUrl = ''
-
-    if (item.public_profile_url) {
-      // Sales Nav: clean URL like https://www.linkedin.com/in/john-smith
-      profileUrl = item.public_profile_url.split('?')[0].replace(/\/$/, '')
-    } else if (item.public_identifier) {
-      // Sales Nav fallback: build from slug
-      profileUrl = `https://www.linkedin.com/in/${item.public_identifier}`
-    } else if (item.profile_url) {
-      // Classic: profile_url may be like "https://www.linkedin.com/in/slug?miniProfileUrn=..."
-      const stripped = item.profile_url.split('?')[0].replace(/\/$/, '')
-      const slug = stripped.split('/in/')[1] || ''
-      
-      // Check if slug is a real LinkedIn username (not a URN)
-      if (slug && !slug.startsWith('urn:') && !slug.startsWith('ACo') && !slug.startsWith('AEo') && !/[+/=]/.test(slug)) {
-        profileUrl = stripped
-      }
-    }
-    
-    // If we still don't have a URL, try member_urn or provider_id
-    if (!profileUrl) {
-      const memberId = item.member_urn?.split(':').pop() || item.provider_id || item.id
-      if (memberId && memberId !== 'undefined' && memberId !== 'null') {
-        // Use LinkedIn's member ID format which always works
-        profileUrl = `https://www.linkedin.com/in/member/${memberId}`
-      }
-    }
-
-    // Ensure absolute URL
-    if (profileUrl && !profileUrl.startsWith('http')) {
-      profileUrl = 'https://www.linkedin.com' + (profileUrl.startsWith('/') ? '' : '/') + profileUrl
-    }
-
-    // Company: Sales Nav / Recruiter have current_positions; Classic doesn't.
-    // Fall back to parsing headline ("Title @ Company" or "Title at Company").
-    const companyFromPositions =
-      item.current_positions?.[0]?.company_name ||
-      item.current_positions?.[0]?.company ||
-      item.positions?.[0]?.company_name ||
-      item.positions?.[0]?.company ||
-      ''
-    const headline = item.headline || item.summary || ''
-    const companyFromHeadline = headline.includes(' at ')
-      ? headline.split(' at ').slice(1).join(' at ').trim()
-      : headline.includes(' @ ')
-        ? headline.split(' @ ').slice(1).join(' @ ').trim()
-        : ''
-    const company = companyFromPositions || companyFromHeadline
-
-    // Title: use current_positions[0].role first (Recruiter/Sales Nav),
-    // then parse from headline ("Title at Company" / "Title @ Company")
-    const roleFromPositions = item.current_positions?.[0]?.role || item.positions?.[0]?.role || ''
-    const titleFromHeadline = headline.includes(' at ')
-      ? headline.split(' at ')[0].trim()
-      : headline.includes(' @ ')
-        ? headline.split(' @ ')[0].trim()
-        : ''
-    const title = roleFromPositions || titleFromHeadline || headline
-
-    // Name: Recruiter anonymizes names as "LinkedIn Member" — use role + company as fallback.
-    // For Classic/Sales Nav, item.name is always a real name. If it's null, mark as unknown
-    // rather than using the headline/title (which would show job titles as names).
-    const rawName = item.name || [item.first_name, item.last_name].filter(Boolean).join(' ')
-    const isAnonymized = !rawName || rawName === 'LinkedIn Member' || rawName === 'LinkedIn User'
-    
-    const fullName = isAnonymized
-      ? (title && company ? `${title} at ${company}` : title && title !== headline ? title : 'LinkedIn Member')
-      : rawName
-
-    return {
-      workspace_id:       workspaceId,
-      action_queue_id:    actionId,
-      full_name:          fullName,
-      first_name:         item.first_name || null,
-      last_name:          item.last_name  || null,
-      headline,
-      title,
-      company,
-      profile_url:        profileUrl,
-      avatar_url:         item.profile_picture_url || item.picture_url || '',
-      location:           item.location || item.geo_location || '',
-      linkedin_member_id: item.provider_id || item.id || item.member_urn || '',
-      source:             'unipile-search',
-      connection_status:  'none',
-    }
-  }
-
-  // Run extraction once on mount — use a local cancelled flag instead of a ref
-  // so React StrictMode's double-invoke correctly cancels the first run and
-  // lets the second (real) run proceed.
+  // Run extraction once on mount.
+  // We use the module-level extractionCancelled ref (not a local variable) so
+  // closing the modal does NOT stop the loop — it genuinely continues in the
+  // background.  React StrictMode double-invoke is handled by resetting the
+  // flag at the start of each mount and cancelling on the first cleanup.
   React.useEffect(() => {
-    let cancelled = false
+    // Mark any previous run as cancelled (handles StrictMode double-invoke)
+    extractionCancelled.current = true
+    // Small tick so the previous async iteration sees the cancellation
+    const startTimer = setTimeout(() => {
+      extractionCancelled.current = false  // start fresh for this run
 
-    if (!unipileAccountId || !workspaceId) {
-      setStatus('failed')
-      setErrorMsg('Missing account or workspace. Go back and try again.')
-      return
+      if (!unipileAccountId || !workspaceId) {
+        setStatus('failed')
+        setErrorMsg('Missing account or workspace. Go back and try again.')
+        return
+      }
+
+      setStatus('running')
+      run()
+    }, 0)
+
+    return () => {
+      clearTimeout(startTimer)
+      // Only cancel on unmount if extraction hasn't finished yet.
+      // We intentionally do NOT set extractionCancelled.current = true here —
+      // that would stop the background loop when the modal closes.
     }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-    setStatus('running')
-
-    const run = async () => {
-      try {
+  const run = async () => {
+    try {
         // 0. Health-check the backend
         try {
           const health = await fetch(BACKEND_URL + '/health', { signal: AbortSignal.timeout(4000) })
@@ -1147,7 +1134,7 @@ function UnipileResultsStep({ onBack, onClose }) {
             'Make sure it is running: cd backend && uvicorn main:app --reload --port 3000'
           )
         }
-        if (cancelled) return
+        if (extractionCancelled.current) return
 
         // 1. Create campaign record
         const { data: campaign, error: campErr } = await supabase
@@ -1163,7 +1150,7 @@ function UnipileResultsStep({ onBack, onClose }) {
           .select()
           .single()
         if (campErr) throw campErr
-        if (cancelled) return
+        if (extractionCancelled.current) return
 
         // 2. Create action_queue record
         const { data: action, error: actErr } = await supabase
@@ -1179,7 +1166,7 @@ function UnipileResultsStep({ onBack, onClose }) {
           .select()
           .single()
         if (actErr) throw actErr
-        if (cancelled) return
+        if (extractionCancelled.current) return
 
         // 3. Pagination loop
         const { api, category, keywords, filters = {} } = searchParams
@@ -1187,23 +1174,15 @@ function UnipileResultsStep({ onBack, onClose }) {
         let totalScraped = 0
         let pageNum = 0
 
-        while (totalScraped < maxLeads && !cancelled) {
+        while (totalScraped < maxLeads && !extractionCancelled.current) {
           const pageLimit = Math.min(25, maxLeads - totalScraped)
 
-          // Build the search body that goes to Unipile via the backend proxy.
-          // The backend merges `limit` into this body, so don't include it here.
-          const searchBody = {
-            api,
-            category,
-            ...(keywords ? { keywords } : {}),
-            ...(Object.keys(filters).length > 0 ? { filters } : {}),
-            ...(cursor ? { cursor } : {}),
-          }
+          // Build the search body — filters are spread at top level (Bug #1 fix)
+          const searchBody = buildSearchBody({ api, category, keywords, filters, cursor })
 
           const res = await fetch(BACKEND_URL + '/api/linkedin/search', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-            // Backend expects: { account_id, limit, body: <search params> }
             body: JSON.stringify({
               account_id: unipileAccountId,
               limit: pageLimit,
@@ -1223,10 +1202,9 @@ function UnipileResultsStep({ onBack, onClose }) {
             total: data.paging?.total_count,
             totalScraped,
             maxLeads,
-            // Show all keys of first item so we know what fields are available
+            searchBody,
             firstItemKeys: data.items?.[0] ? Object.keys(data.items[0]) : [],
             firstItem: data.items?.[0],
-            // Show first 3 items with name data
             sampleNames: data.items?.slice(0, 3).map(item => ({
               name: item.name,
               first_name: item.first_name,
@@ -1237,36 +1215,29 @@ function UnipileResultsStep({ onBack, onClose }) {
           })
 
           if (pageNum === 0 && data.paging?.total_count) {
-            // Cap the displayed total at what LinkedIn actually has
             setTotal(Math.min(data.paging.total_count, maxLeads))
           }
 
           const items = data.items || []
           if (items.length === 0) break
-          if (cancelled) break
+          if (extractionCancelled.current) break
 
           const remaining  = maxLeads - totalScraped
-          const pageLeads  = items.slice(0, remaining).map(item => mapItem(item, action.id))
+          const pageLeads  = items.slice(0, remaining).map(item => mapUnipileItem(item, workspaceId, action.id))
           const validLeads = pageLeads.filter(l => !!l.profile_url)
 
           console.log(`[Extraction] Page ${pageNum}: ${items.length} items, ${validLeads.length} with profile_url`)
 
-          // Note: Profile enrichment disabled because LinkedIn blocks access to most profiles
-          // with 422 "Recipient cannot be reached" errors. This is LinkedIn's privacy system.
-          // Names that aren't in search results are intentionally hidden by LinkedIn.
-
-          if (validLeads.length > 0 && !cancelled) {
+          if (validLeads.length > 0 && !extractionCancelled.current) {
             const { error: insertErr } = await supabase
               .from('leads')
               .upsert(validLeads, { onConflict: 'workspace_id,profile_url', ignoreDuplicates: false })
             if (insertErr) {
               console.error('[Extraction] Upsert error:', insertErr.message, insertErr.details)
-              // Still count them — don't stall the loop on duplicate errors
             }
             totalScraped += validLeads.length
             setScraped(totalScraped)
           } else if (validLeads.length === 0 && items.length > 0) {
-            // All items on this page had no profile_url — count them anyway to avoid infinite loop
             totalScraped += items.length
           }
 
@@ -1277,7 +1248,7 @@ function UnipileResultsStep({ onBack, onClose }) {
           await new Promise(r => setTimeout(r, 800))
         }
 
-        if (cancelled) return
+        if (extractionCancelled.current) return
 
         // 4. Mark done
         await supabase
@@ -1287,19 +1258,13 @@ function UnipileResultsStep({ onBack, onClose }) {
 
         setStatus('done')
       } catch (err) {
-        if (!cancelled) {
+        if (!extractionCancelled.current) {
           console.error('[Extraction] Failed:', err)
           setStatus('failed')
           setErrorMsg(err.message || 'Extraction failed')
         }
       }
-    }
-
-    run()
-
-    // Cleanup: mark cancelled so any in-flight async steps stop gracefully
-    return () => { cancelled = true }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }
 
   const displayTotal = total || maxLeads
   const pct = Math.min(100, Math.round((scraped / displayTotal) * 100))

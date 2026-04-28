@@ -177,7 +177,19 @@ serve(async (req: Request) => {
       .single()
     if (campErr || !campaign) throw campErr || new Error('Campaign not found')
 
-    const { nodes = [], edges = [] } = (campaign.sequence_json || {}) as { nodes: SequenceNode[], edges: SequenceEdge[] }
+    // sequence_json can be stored in two formats:
+    // 1. { nodes: [...], edges: [...] }  — current wizard format
+    // 2. [...nodes]                      — legacy flat array (nodes only, no edges)
+    const raw = campaign.sequence_json || {}
+    let nodes: SequenceNode[] = []
+    let edges: SequenceEdge[] = []
+    if (Array.isArray(raw)) {
+      nodes = raw as SequenceNode[]
+      edges = []
+    } else {
+      nodes = (raw as any).nodes || []
+      edges = (raw as any).edges || []
+    }
     const steps = walkSequence(nodes, edges)
 
     if (steps.length === 0) {
@@ -230,10 +242,12 @@ serve(async (req: Request) => {
     const leadMap = new Map((leads || []).map((l: any) => [l.id, l]))
 
     // Filter out enrollments where lead is missing linkedin_member_id
+    const skippedEnrollments: string[] = []
     const validEnrollments = enrollments.filter((e: any) => {
       const lead = leadMap.get(e.lead_id) as any
       if (!lead?.linkedin_member_id) {
         console.warn(`Skipping enrollment ${e.id}: lead ${e.lead_id} missing linkedin_member_id`)
+        skippedEnrollments.push(e.lead_id)
         return false
       }
       return true
@@ -243,10 +257,23 @@ serve(async (req: Request) => {
       return new Response(JSON.stringify({ 
         success: true, 
         queued: 0, 
-        message: 'No enrollments with valid linkedin_member_id. Please enrich leads first.' 
+        message: 'No enrollments with valid linkedin_member_id. Please enrich leads first.',
+        skipped_leads: skippedEnrollments,
       }), {
         headers: corsHeaders,
       })
+    }
+
+    // Mark unenrichable enrollments as 'error' so they don't block campaign completion
+    if (skippedEnrollments.length > 0) {
+      await supabase
+        .from('campaign_enrollments')
+        .update({
+          status: 'error',
+          completed_at: new Date().toISOString(),
+        })
+        .eq('campaign_id', campaign_id)
+        .in('lead_id', skippedEnrollments)
     }
 
     // Fetch existing action_queue entries for this campaign to avoid re-queuing
@@ -469,7 +496,7 @@ serve(async (req: Request) => {
       }
     }
 
-    return new Response(JSON.stringify({ success: true, queued: inserted?.length ?? 0 }), {
+    return new Response(JSON.stringify({ success: true, queued: inserted?.length ?? 0, skipped_leads: skippedEnrollments }), {
       headers: corsHeaders,
     })
   } catch (error: unknown) {

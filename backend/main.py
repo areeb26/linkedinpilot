@@ -427,6 +427,21 @@ async def run_action(action_id: str):
 
                 result = await _execute_action(action)
 
+                # If the action was skipped due to unmet conditions, do not
+                # increment daily counters and mark it as "skipped" status.
+                if isinstance(result, dict) and result.get("skipped"):
+                    supabase.table("action_queue").update({
+                        "status": "skipped",
+                        "executed_at": datetime.now(timezone.utc).isoformat(),
+                        "result": result,
+                    }).eq("id", action_id).execute()
+                    logger.info(
+                        f"Action {action_id} ({action['action_type']}) skipped "
+                        f"(conditions not met) — counter not incremented."
+                    )
+                    success = True
+                    continue
+
                 # Write success
                 supabase.table("action_queue").update({
                     "status": "done",
